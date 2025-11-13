@@ -20,9 +20,12 @@ MQTT_RATE_LIMIT="10.0"
 #   --disable-mqtt      : Disable MQTT publishing entirely
 #   --verbose          : Enable verbose logging
 #   --quiet            : Enable quiet mode (minimal logging)
-EXTRA_ARGS=""
+#   --cga-format       : Publish in CGA network format
+#   --anchor-config    : Path to anchor configuration JSON file
+EXTRA_ARGS="--cga-format --anchor-config /etc/uwb_anchors_hw_lab.json"
 
 # Examples:
 # EXTRA_ARGS="--verbose"
 # EXTRA_ARGS="--quiet"
 # EXTRA_ARGS="--disable-mqtt --verbose"
+# EXTRA_ARGS="--cga-format --anchor-config /etc/uwb_anchors.json"

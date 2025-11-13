@@ -14,7 +14,8 @@ ExecStart=/usr/bin/uwb-mqtt-publisher ${UART_PORT} \
     --mqtt-broker ${MQTT_BROKER} \
     --mqtt-port ${MQTT_PORT} \
     --mqtt-topic ${MQTT_TOPIC} \
-    --mqtt-rate-limit ${MQTT_RATE_LIMIT}
+    --mqtt-rate-limit ${MQTT_RATE_LIMIT} \
+    ${EXTRA_ARGS}
 ExecReload=/bin/kill -HUP $MAINPID
 Restart=always
 RestartSec=10
