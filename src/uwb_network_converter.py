@@ -12,6 +12,7 @@ Reviewer: Jen
 import json
 import time
 import os
+from datetime import datetime
 
 
 class UwbNetworkConverter:
@@ -162,6 +163,16 @@ class UwbNetworkConverter:
                             loc.get("altitude", 0.0)
                         ]
                         position_known = True
+                        # Update lastPositionUpdateTime to when LoRa data was received
+                        if lora_data.get("timestamp"):
+                            timestamp = lora_data["timestamp"]
+                        elif lora_data.get("received_at"):
+                            # Parse ISO timestamp if available
+                            try:
+                                dt = datetime.fromisoformat(lora_data["received_at"].replace('Z', '+00:00'))
+                                timestamp = dt.timestamp()
+                            except:
+                                pass
             else:
                 # For anchors, still check LoRa cache for metadata (battery, etc.) but don't override position
                 lora_data = None
@@ -185,7 +196,13 @@ class UwbNetworkConverter:
             
             # Add LoRa metadata if available
             if lora_data:
-                # Add decoded payload fields (battery, temperature, etc.)
+                # Add timestamp for when LoRa data was cached (to track data age)
+                if lora_data.get("timestamp"):
+                    uwb["loraDataTimestamp"] = lora_data["timestamp"]
+                if lora_data.get("received_at"):
+                    uwb["loraReceivedAt"] = lora_data["received_at"]
+                
+                # Add decoded payload fields (battery, temperature, triage, etc.)
                 decoded = lora_data.get("decoded_payload", {})
                 if decoded:
                     # Add common fields that might be in decoded payload
@@ -195,14 +212,31 @@ class UwbNetworkConverter:
                         uwb["temperature"] = decoded["temperature"]
                     if "humidity" in decoded:
                         uwb["humidity"] = decoded["humidity"]
+                    # Add triage status if available
+                    if "triage" in decoded or "triageStatus" in decoded:
+                        triage_value = decoded.get("triage") or decoded.get("triageStatus")
+                        if triage_value is not None:
+                            uwb["triageStatus"] = triage_value
                     # Add any other decoded fields
                     for key, value in decoded.items():
-                        if key not in ["battery", "temperature", "humidity"]:
+                        if key not in ["battery", "temperature", "humidity", "triage", "triageStatus"]:
                             uwb[f"lora_{key}"] = value
                 
-                # Add location accuracy if available
-                if lora_data.get("location", {}).get("accuracy"):
-                    uwb["positionAccuracy"] = lora_data["location"]["accuracy"]
+                # Add location accuracy and timestamp if GPS coordinates were added
+                location = lora_data.get("location", {})
+                if location.get("accuracy"):
+                    uwb["positionAccuracy"] = location["accuracy"]
+                if location.get("source"):
+                    uwb["positionSource"] = location["source"]
+                
+                # Add metadata (frame counter, device ID, etc.)
+                metadata = lora_data.get("metadata", {})
+                if metadata.get("f_cnt") is not None:
+                    uwb["loraFrameCount"] = metadata["f_cnt"]
+                if metadata.get("f_port") is not None:
+                    uwb["loraPort"] = metadata["f_port"]
+                if metadata.get("device_id"):
+                    uwb["loraDeviceId"] = metadata["device_id"]
                 
                 # Add RX metadata (gateway info, RSSI, SNR)
                 rx_metadata = lora_data.get("rx_metadata", [])
@@ -210,6 +244,7 @@ class UwbNetworkConverter:
                     # Use the best RSSI/SNR from all gateways
                     best_rssi = None
                     best_snr = None
+                    gateway_count = len(rx_metadata)
                     for rx in rx_metadata:
                         if rx.get("rssi") is not None:
                             if best_rssi is None or rx["rssi"] > best_rssi:
@@ -222,6 +257,8 @@ class UwbNetworkConverter:
                         uwb["rssi"] = best_rssi
                     if best_snr is not None:
                         uwb["snr"] = best_snr
+                    if gateway_count > 0:
+                        uwb["loraGatewayCount"] = gateway_count
             
             uwbs.append(uwb)
         
