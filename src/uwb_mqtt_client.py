@@ -126,15 +126,19 @@ class UwbMqttClient:
             self.client.on_log = self._on_log
             self.client.on_message = self._on_message
 
-            self._log(f"Configuring SSL for broker {self.broker}:{self.port}", "VERBOSE")
+            # Only configure SSL/TLS for secure ports (typically 8883)
+            # Port 1883 is plain MQTT without TLS
+            if self.port == 8883 or self.port == 8884:
+                self._log(f"Configuring SSL/TLS for broker {self.broker}:{self.port}", "VERBOSE")
+                # Configure SSL
+                context = ssl.create_default_context(ssl.Purpose.SERVER_AUTH)
+                context.check_hostname = False
+                context.verify_mode = ssl.CERT_NONE
 
-            # Configure SSL
-            context = ssl.create_default_context(ssl.Purpose.SERVER_AUTH)
-            context.check_hostname = False
-            context.verify_mode = ssl.CERT_NONE
-
-            self.client.tls_set_context(context)
-            self._log("SSL context applied to MQTT client", "VERBOSE")
+                self.client.tls_set_context(context)
+                self._log("SSL context applied to MQTT client", "VERBOSE")
+            else:
+                self._log(f"Using plain MQTT (no TLS) for broker {self.broker}:{self.port}", "VERBOSE")
 
             # Connect to broker
             self._log(f"Attempting to connect to {self.broker}:{self.port}", "VERBOSE")
