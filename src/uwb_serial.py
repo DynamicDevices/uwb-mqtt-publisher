@@ -12,11 +12,11 @@ import sys
 def connect_serial(uart, verbose=False):
     """
     Connect to serial port.
-    
+
     Args:
         uart: Serial port path (e.g., '/dev/ttyUSB0')
         verbose: Enable verbose logging
-        
+
     Returns:
         Serial port object or None on failure
     """
@@ -30,12 +30,12 @@ def connect_serial(uart, verbose=False):
         ser.xonxoff = False
         ser.open()
         ser.dtr = False
-        
+
     except serial.SerialException as e:
         if verbose:
             print(f"[ERROR] Serial connection failed: {e}")
         return None
-    
+
     time.sleep(0.5)
     if verbose:
         print(f"[VERBOSE] Serial connection established: {ser.read(ser.in_waiting)}")
@@ -46,7 +46,7 @@ def connect_serial(uart, verbose=False):
 def disconnect_serial(ser):
     """Disconnect from serial port."""
     if ser:
-        ser.rts = False  
+        ser.rts = False
         ser.close()
         ser.is_open = False
 
@@ -57,7 +57,7 @@ def flush_rx(ser):
         n = ser.in_waiting
         msg = ser.read(n)
         return msg
-        
+
     except serial.SerialException as e:
         print(f"[ERROR] Serial read error: {e}")
         disconnect_serial(ser)
@@ -67,7 +67,7 @@ def flush_rx(ser):
 def reset_device(ser, verbose=False):
     """
     Reset the UWB device via DTR line.
-    
+
     Args:
         ser: Serial port object
         verbose: Enable verbose logging
@@ -89,4 +89,3 @@ def read_serial(d, nbytes):
     """Read data from serial port."""
     s = d.read(nbytes)
     return [ord(c) for c in s] if type(s) is str else list(s)
-
