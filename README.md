@@ -14,16 +14,20 @@ A service that reads Ultra-Wideband (UWB) positioning data from a serial port an
 
 ### Main Scripts
 
-- **`mqtt-live-publisher.py`**: Main application that reads UWB data and publishes to MQTT
-- **`uwb_network_converter.py`**: Converts edge list format to CGA network format
-- **`lora_tag_cache.py`**: Subscribes to TTN MQTT and caches LoRa tag data
+- **`src/mqtt-live-publisher.py`**: Main application that reads UWB data and publishes to MQTT
+- **`src/uwb_network_converter.py`**: Converts edge list format to CGA network format
+- **`src/lora_tag_cache.py`**: Subscribes to TTN MQTT and caches LoRa tag data
 
 ### Configuration Files
 
-- **`uwb_anchors.json`**: Anchor point coordinates and dev_eui to UWB ID mappings
-- **`uwb-mqtt-publisher.service`**: Systemd service file
-- **`uwb-mqtt-publisher.default`**: Default environment variables
-- **`uwb-mqtt-publisher.conf`**: Configuration documentation
+- **`config/uwb_anchors.json`**: Anchor point coordinates and dev_eui to UWB ID mappings
+- **`config/uwb_anchors_hw_lab.json`**: Hardware lab test anchor configuration
+- **`config/uwb-mqtt-publisher.default`**: Default environment variables
+- **`config/uwb-mqtt-publisher.conf`**: Configuration documentation
+
+### Systemd Service
+
+- **`systemd/uwb-mqtt-publisher.service`**: Systemd service file
 
 ## Installation
 
@@ -52,16 +56,16 @@ The recipe will automatically:
 
 2. Install Python scripts:
    ```bash
-   sudo install -m 0755 mqtt-live-publisher.py /usr/bin/uwb-mqtt-publisher
-   sudo install -m 0644 uwb_network_converter.py /usr/bin/
-   sudo install -m 0644 lora_tag_cache.py /usr/bin/
+   sudo install -m 0755 src/mqtt-live-publisher.py /usr/bin/uwb-mqtt-publisher
+   sudo install -m 0644 src/uwb_network_converter.py /usr/bin/
+   sudo install -m 0644 src/lora_tag_cache.py /usr/bin/
    ```
 
 3. Install configuration:
    ```bash
-   sudo install -m 0644 uwb_anchors.json /etc/
-   sudo install -m 0644 uwb-mqtt-publisher.service /etc/systemd/system/
-   sudo install -m 0644 uwb-mqtt-publisher.default /etc/default/
+   sudo install -m 0644 config/uwb_anchors.json /etc/
+   sudo install -m 0644 systemd/uwb-mqtt-publisher.service /etc/systemd/system/
+   sudo install -m 0644 config/uwb-mqtt-publisher.default /etc/default/
    ```
 
 4. Enable and start the service:
@@ -234,15 +238,21 @@ The service expects UWB distance measurements in binary format from the serial p
 
 ```
 uwb-mqtt-publisher/
-├── mqtt-live-publisher.py      # Main application
-├── uwb_network_converter.py    # CGA format converter
-├── lora_tag_cache.py           # LoRa tag cache
-├── uwb_anchors.json            # Anchor configuration
-├── uwb-mqtt-publisher.service  # Systemd service file
-├── uwb-mqtt-publisher.default  # Default environment variables
-├── uwb-mqtt-publisher.conf     # Configuration documentation
-├── .gitignore                  # Git ignore rules
-└── README.md                   # This file
+├── src/
+│   ├── mqtt-live-publisher.py      # Main application
+│   ├── uwb_network_converter.py    # CGA format converter
+│   └── lora_tag_cache.py           # LoRa tag cache
+├── config/
+│   ├── uwb_anchors.json            # Anchor configuration
+│   ├── uwb_anchors_hw_lab.json    # Hardware lab test configuration
+│   ├── uwb-mqtt-publisher.default  # Default environment variables
+│   └── uwb-mqtt-publisher.conf     # Configuration documentation
+├── systemd/
+│   └── uwb-mqtt-publisher.service  # Systemd service file
+├── .gitignore                      # Git ignore rules
+├── LICENSE                         # License file
+├── CONTRIBUTING.md                 # Contributing guidelines
+└── README.md                       # This file
 ```
 
 ### Contributing
