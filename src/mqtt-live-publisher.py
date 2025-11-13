@@ -88,6 +88,7 @@ parser.add_argument("--verbose", help="Enable verbose logging", action="store_tr
 parser.add_argument("--quiet", help="Enable quiet mode (minimal logging)", action="store_true")
 parser.add_argument("--cga-format", help="Publish in CGA network format instead of simple edge list", action="store_true")
 parser.add_argument("--anchor-config", help="Path to JSON config file with anchor point coordinates", type=str, default=None)
+parser.add_argument("--dev-eui-mapping", help="Path to JSON config file with dev_eui to UWB ID mappings", type=str, default=None)
 parser.add_argument("--lora-broker", help="LoRa MQTT broker hostname (for tag data)", type=str, default="eu1.cloud.thethings.network")
 parser.add_argument("--lora-port", help="LoRa MQTT broker port", type=int, default=8883)
 parser.add_argument("--lora-username", help="LoRa MQTT username", type=str, default=None)
@@ -107,7 +108,7 @@ if args.cga_format:
     if UwbNetworkConverter is None:
         print("[ERROR] --cga-format requires uwb_network_converter.py module")
         sys.exit(1)
-    uwb_converter = UwbNetworkConverter(anchor_config_path=args.anchor_config)
+    uwb_converter = UwbNetworkConverter(anchor_config_path=args.anchor_config, dev_eui_mapping_path=args.dev_eui_mapping)
 
 # LoRa Tag Data Cache instance
 lora_cache = None
@@ -570,6 +571,10 @@ if args.cga_format:
         log_start(f"Anchor config: {args.anchor_config}")
     else:
         log_start("Anchor config: None (no anchor points configured)")
+    if args.dev_eui_mapping:
+        log_start(f"Dev EUI mapping: {args.dev_eui_mapping}")
+    else:
+        log_start("Dev EUI mapping: None (no dev_eui mappings configured)")
 else:
     log_start("Output format: Simple edge list")
 if args.enable_lora_cache:

@@ -27,7 +27,7 @@ class UwbNetworkConverter:
         network_json = converter.convert_edges_to_network(edge_list)
     """
     
-    def __init__(self, anchor_config_path=None):
+    def __init__(self, anchor_config_path=None, dev_eui_mapping_path=None):
         """
         Initialize the converter with anchor point configuration.
         
@@ -35,8 +35,12 @@ class UwbNetworkConverter:
             anchor_config_path (str, optional): Path to JSON config file with anchor points.
                 Format: {"anchors": [{"id": "B5A4", "lat": 53.48..., "lon": -2.19..., "alt": 0}, ...]}
                 If None, no anchor points will be configured.
+            dev_eui_mapping_path (str, optional): Path to JSON config file with dev_eui to UWB ID mappings.
+                Format: {"dev_eui_to_uwb_id": {"F4CE36E6CD722E97": "8FA4", ...}}
+                If None, no dev_eui mappings will be configured.
         """
         self.anchor_config_path = anchor_config_path
+        self.dev_eui_mapping_path = dev_eui_mapping_path
         self.anchor_map = {}  # Maps anchor ID to [lat, lon, alt]
         self.dev_eui_to_uwb_id_map = {}  # Maps dev_eui (hex string) to UWB ID (hex string)
         
@@ -44,6 +48,11 @@ class UwbNetworkConverter:
             self._load_anchor_config()
         elif anchor_config_path:
             print(f"[WARNING] Anchor config file not found: {anchor_config_path}")
+        
+        if dev_eui_mapping_path and os.path.exists(dev_eui_mapping_path):
+            self._load_dev_eui_mapping()
+        elif dev_eui_mapping_path:
+            print(f"[WARNING] Dev EUI mapping file not found: {dev_eui_mapping_path}")
     
     def _load_anchor_config(self):
         """Load anchor point configuration from JSON file."""
@@ -68,18 +77,31 @@ class UwbNetworkConverter:
                 self.anchor_map[anchor_id] = [lat, lon, alt]
             
             print(f"[INFO] Loaded {len(self.anchor_map)} anchor points from config")
-            
-            # Load dev_eui to UWB ID mapping if present
-            if 'dev_eui_to_uwb_id' in config:
-                self.dev_eui_to_uwb_id_map = config['dev_eui_to_uwb_id']
-                # Normalize keys to uppercase
-                self.dev_eui_to_uwb_id_map = {k.upper(): v.upper() for k, v in self.dev_eui_to_uwb_id_map.items()}
-                print(f"[INFO] Loaded {len(self.dev_eui_to_uwb_id_map)} dev_eui to UWB ID mappings")
         
         except json.JSONDecodeError as e:
             print(f"[ERROR] Failed to parse anchor config JSON: {e}")
         except Exception as e:
             print(f"[ERROR] Failed to load anchor config: {e}")
+    
+    def _load_dev_eui_mapping(self):
+        """Load dev_eui to UWB ID mapping from separate JSON file."""
+        try:
+            with open(self.dev_eui_mapping_path, 'r') as f:
+                config = json.load(f)
+            
+            if 'dev_eui_to_uwb_id' not in config:
+                print(f"[WARNING] No 'dev_eui_to_uwb_id' key found in mapping file")
+                return
+            
+            self.dev_eui_to_uwb_id_map = config['dev_eui_to_uwb_id']
+            # Normalize keys to uppercase
+            self.dev_eui_to_uwb_id_map = {k.upper(): v.upper() for k, v in self.dev_eui_to_uwb_id_map.items()}
+            print(f"[INFO] Loaded {len(self.dev_eui_to_uwb_id_map)} dev_eui to UWB ID mappings")
+        
+        except json.JSONDecodeError as e:
+            print(f"[ERROR] Failed to parse dev_eui mapping JSON: {e}")
+        except Exception as e:
+            print(f"[ERROR] Failed to load dev_eui mapping: {e}")
     
     def convert_edges_to_network(self, edge_list, timestamp=None):
         """
