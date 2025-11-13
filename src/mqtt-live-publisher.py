@@ -136,7 +136,7 @@ class PacketProcessor:
         if self.uwb_converter is not None:
             try:
                 network_data = self.uwb_converter.convert_edges_to_network(formatted_data, timestamp=current_timestamp)
-                self.logger.verbose("Converted to CGA network format")
+                # Don't log every conversion (too verbose) - only log on errors
                 if self.mqtt_client:
                     self.mqtt_client.publish(network_data)
             except Exception as e:
@@ -281,7 +281,9 @@ def main():
                                     raise ValueError("Payload too short")
                                 
                                 [act_type, act_slot, timeframe] = struct.unpack('<BbH', bytes(payload[idx:(idx+4)]))
-                                logger.verbose(f"act_type: {hex(act_type)}: {act_slot}/{timeframe}")
+                                # Only log act_type for assignment packets (type 2) to reduce noise
+                                if payload[0] == 2:
+                                    logger.verbose(f"Assignment packet: act_type={hex(act_type)}, slot={act_slot}, timeframe={timeframe}")
                                 idx = idx + 4
                                 
                                 if payload[0] == 2:
@@ -291,7 +293,8 @@ def main():
                                         raise ValueError("Assignment payload too short")
                                     
                                     [tx_pwr, mode, g1, g2, g3] = struct.unpack('<BBBBB', bytes(payload[idx:(idx+5)]))
-                                    logger.verbose(f"mode: {hex(mode)}: {g1}/{g2}/{g3}")
+                                    # Only log mode details if groups changed significantly
+                                    logger.verbose(f"Assignment: mode={hex(mode)}, groups=[{g1}, {g2}, {g3}]")
                                     idx = idx + 5
                                     
                                     group1 = []
@@ -320,7 +323,10 @@ def main():
                                         idx = idx + 2
                                     
                                     assignments = [group1, group2, group3]
-                                    logger.verbose(f"Assignments: {assignments}")
+                                    # Only log assignments if they changed (reduce noise)
+                                    if not hasattr(processor, '_last_assignments') or processor._last_assignments != assignments:
+                                        logger.verbose(f"New assignments: group1={len(group1)}, group2={len(group2)}, group3={len(group3)}")
+                                        processor._last_assignments = assignments
                                 
                                 if payload[0] == 4:
                                     # Distance measurement packet
@@ -341,7 +347,7 @@ def main():
                                         tof_count = tof_count + g2 * (g2-1) / 2
                                     
                                     tof_count = int(tof_count)
-                                    logger.verbose(f"tof_count = {tof_count}")
+                                    # Don't log tof_count every time (too verbose)
                                     
                                     ii = (idx + tof_count * 2)
                                     
@@ -353,8 +359,7 @@ def main():
                                         assignments[2][g3 - unassigned_count + i] = id
                                     
                                     # Parse final payload
-                                    # Log assignment details for debugging
-                                    logger.verbose(f"Parsing final payload: assignments={assignments}, payload_len={len(payload[idx:])}, mode={mode}, idx={idx}")
+                                    # Only log parsing details if verbose and first time or on error
                                     results = uwb_packet_parser.parse_final_payload(
                                         assignments,
                                         bytes(payload[idx:]),
