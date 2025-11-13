@@ -413,6 +413,54 @@ if __name__ == '__main__':
     main()
 ```
 
+### Method 5: Test with Real LoRa Data
+
+#### Step 1: Test LoRa Reception
+
+Test receiving real LoRa data from TTN:
+```bash
+python3 test/test_lora_receive.py \
+    --lora-broker eu1.cloud.thethings.network \
+    --lora-port 8883 \
+    --lora-username <your-ttn-username> \
+    --lora-password <your-ttn-password> \
+    --lora-topic "#" \
+    --dev-eui-mapping config/dev_eui_to_uwb_mappings.json \
+    --verbose
+```
+
+This will:
+- Connect to TTN MQTT broker
+- Subscribe to LoRa uplink messages
+- Cache messages and map dev_eui to UWB IDs
+- Display statistics every 5 seconds
+- Show sample cached data
+
+#### Step 2: Test Full Integration with Real LoRa Data
+
+Run the full application with real LoRa cache:
+```bash
+# Terminal 1: Create virtual serial port (if testing without real UWB device)
+socat -d -d pty,raw,echo=0 pty,raw,echo=0
+
+# Terminal 2: Generate test UWB packets (if needed)
+python3 test/generate_test_packets.py | socat - /dev/pts/X
+
+# Terminal 3: Run application with real LoRa cache
+python3 src/mqtt-live-publisher.py /dev/pts/Y \
+    --disable-mqtt \
+    --verbose \
+    --cga-format \
+    --anchor-config config/uwb_anchors_hw_lab.json \
+    --dev-eui-mapping config/dev_eui_to_uwb_mappings.json \
+    --enable-lora-cache \
+    --lora-broker eu1.cloud.thethings.network \
+    --lora-port 8883 \
+    --lora-username <your-ttn-username> \
+    --lora-password <your-ttn-password> \
+    --lora-topic "#"
+```
+
 ## Quick Start Testing
 
 ### Minimal Test (No MQTT, No Serial)
