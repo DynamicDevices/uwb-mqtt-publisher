@@ -1,5 +1,22 @@
 {
-  "anchors": [],
-  "dev_eui_to_uwb_id": {}
+  "anchors": [
+    {
+      "id": "VELO_01",
+      "lat": 0.0,
+      "lon": 0.0,
+      "alt": 2.5
+    },
+    {
+      "id": "VELO_02",
+      "lat": 0.0,
+      "lon": 0.0,
+      "alt": 2.5
+    },
+    {
+      "id": "VELO_03",
+      "lat": 0.0,
+      "lon": 0.0,
+      "alt": 2.5
+    }
+  ]
 }
-
