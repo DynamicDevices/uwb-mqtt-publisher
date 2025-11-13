@@ -250,25 +250,25 @@ graph TD
 
 ```mermaid
 graph LR
-    RawPacket[Raw UWB Packet<br/>Binary Data] --> Parse[Parse Packet]
-    Parse --> EdgeList[Edge List Format<br/>[node1, node2, distance]]
+    RawPacket["Raw UWB Packet<br/>Binary Data"] --> Parse["Parse Packet"]
+    Parse --> EdgeList["Edge List Format<br/>node1, node2, distance"]
     
     EdgeList --> CheckFormat{Format Type?}
     
-    CheckFormat -->|Simple| SimpleJSON[Simple JSON<br/>Array of edges]
-    CheckFormat -->|CGA| CGAConversion[CGA Conversion]
+    CheckFormat -->|Simple| SimpleJSON["Simple JSON<br/>Array of edges"]
+    CheckFormat -->|CGA| CGAConversion["CGA Conversion"]
     
-    CGAConversion --> AddAnchors[Add Anchor Coordinates<br/>from config<br/>Set positionSource='anchor_config']
-    AddAnchors --> QueryLoRa[Query LoRa Cache<br/>for each UWB ID]
+    CGAConversion --> AddAnchors["Add Anchor Coordinates<br/>from config<br/>Set positionSource=anchor_config"]
+    AddAnchors --> QueryLoRa["Query LoRa Cache<br/>for each UWB ID"]
     QueryLoRa --> CheckCoords{UWB has<br/>coordinates?}
-    CheckCoords -->|No| AddLoRaGPS[Add LoRa GPS Coordinates<br/>Update lastPositionUpdateTime]
-    CheckCoords -->|Yes| KeepAnchorCoords[Keep Anchor Coordinates<br/>Don't override]
-    AddLoRaGPS --> AddLoRaMetadata[Add LoRa Metadata:<br/>timestamps, battery, triage,<br/>RSSI, SNR, gateway count, etc.]
+    CheckCoords -->|No| AddLoRaGPS["Add LoRa GPS Coordinates<br/>Update lastPositionUpdateTime"]
+    CheckCoords -->|Yes| KeepAnchorCoords["Keep Anchor Coordinates<br/>Don't override"]
+    AddLoRaGPS --> AddLoRaMetadata["Add LoRa Metadata:<br/>timestamps, battery, triage,<br/>RSSI, SNR, gateway count, etc."]
     KeepAnchorCoords --> AddLoRaMetadata
-    AddLoRaMetadata --> SetPositionSource[Set positionSource<br/>and positionAccuracy]
-    SetPositionSource --> CGANetwork[CGA Network Format<br/>Structured JSON<br/>with all metadata]
+    AddLoRaMetadata --> SetPositionSource["Set positionSource<br/>and positionAccuracy"]
+    SetPositionSource --> CGANetwork["CGA Network Format<br/>Structured JSON<br/>with all metadata"]
     
-    SimpleJSON --> MQTT[MQTT Publish]
+    SimpleJSON --> MQTT["MQTT Publish"]
     CGANetwork --> MQTT
 ```
 
