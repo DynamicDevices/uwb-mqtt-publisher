@@ -137,28 +137,40 @@ class UwbNetworkConverter:
             is_anchor = uwb_id in self.anchor_map
             anchor_position = self.anchor_map.get(uwb_id, [0.0, 0.0, 0.0])
             
-            # Try to get LoRa data for this UWB ID
-            lora_data = None
-            if self.lora_cache:
-                try:
-                    lora_data = self.lora_cache.get_by_uwb_id(uwb_id)
-                except Exception as e:
-                    # Silently fail if cache lookup fails
-                    pass
-            
-            # Determine position - prefer LoRa GPS, then anchor position
+            # Determine position - use anchor position if available, otherwise try LoRa GPS
             position_known = is_anchor
             lat_lon_alt = anchor_position if is_anchor else [0.0, 0.0, 0.0]
             
-            if lora_data and lora_data.get("location"):
-                loc = lora_data["location"]
-                if loc.get("latitude") and loc.get("longitude"):
-                    lat_lon_alt = [
-                        loc.get("latitude", 0.0),
-                        loc.get("longitude", 0.0),
-                        loc.get("altitude", 0.0)
-                    ]
-                    position_known = True
+            # Only add LoRa GPS coordinates if UWB doesn't already have coordinates (not an anchor)
+            if not is_anchor:
+                # Try to get LoRa data for this UWB ID
+                lora_data = None
+                if self.lora_cache:
+                    try:
+                        lora_data = self.lora_cache.get_by_uwb_id(uwb_id)
+                    except Exception as e:
+                        # Silently fail if cache lookup fails
+                        pass
+                
+                # Add LoRa GPS coordinates if available
+                if lora_data and lora_data.get("location"):
+                    loc = lora_data["location"]
+                    if loc.get("latitude") and loc.get("longitude"):
+                        lat_lon_alt = [
+                            loc.get("latitude", 0.0),
+                            loc.get("longitude", 0.0),
+                            loc.get("altitude", 0.0)
+                        ]
+                        position_known = True
+            else:
+                # For anchors, still check LoRa cache for metadata (battery, etc.) but don't override position
+                lora_data = None
+                if self.lora_cache:
+                    try:
+                        lora_data = self.lora_cache.get_by_uwb_id(uwb_id)
+                    except Exception as e:
+                        # Silently fail if cache lookup fails
+                        pass
             
             uwb = {
                 "id": uwb_id,
