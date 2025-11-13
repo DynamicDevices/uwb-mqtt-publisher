@@ -194,6 +194,10 @@ class UwbNetworkConverter:
                 "positionAccuracy": 0.0
             }
             
+            # Set position source for anchors
+            if is_anchor:
+                uwb["positionSource"] = "anchor_config"
+            
             # Add LoRa metadata if available
             if lora_data:
                 # Add timestamp for when LoRa data was cached (to track data age)
@@ -222,12 +226,17 @@ class UwbNetworkConverter:
                         if key not in ["battery", "temperature", "humidity", "triage", "triageStatus"]:
                             uwb[f"lora_{key}"] = value
                 
-                # Add location accuracy and timestamp if GPS coordinates were added
+                # Add location accuracy and source if GPS coordinates were added
                 location = lora_data.get("location", {})
-                if location.get("accuracy"):
+                if location.get("accuracy") is not None:
                     uwb["positionAccuracy"] = location["accuracy"]
                 if location.get("source"):
-                    uwb["positionSource"] = location["source"]
+                    # Only override positionSource if not already set (anchors keep "anchor_config")
+                    if "positionSource" not in uwb:
+                        uwb["positionSource"] = location["source"]
+                    else:
+                        # If anchor also has LoRa GPS, indicate both sources
+                        uwb["positionSource"] = f"{uwb['positionSource']},lora_{location['source']}"
                 
                 # Add metadata (frame counter, device ID, etc.)
                 metadata = lora_data.get("metadata", {})
