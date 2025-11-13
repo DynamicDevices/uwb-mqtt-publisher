@@ -102,25 +102,26 @@ args = parser.parse_args()
 mqtt_client = None
 last_publish_time = 0
 
-# UWB Network Converter instance (for CGA format)
-uwb_converter = None
-if args.cga_format:
-    if UwbNetworkConverter is None:
-        print("[ERROR] --cga-format requires uwb_network_converter.py module")
-        sys.exit(1)
-    uwb_converter = UwbNetworkConverter(anchor_config_path=args.anchor_config, dev_eui_mapping_path=args.dev_eui_mapping)
+# Load dev_eui mapping if provided (needed for LoRa cache)
+dev_eui_map = {}
+if args.dev_eui_mapping and os.path.exists(args.dev_eui_mapping):
+    try:
+        with open(args.dev_eui_mapping, 'r') as f:
+            config = json.load(f)
+        if 'dev_eui_to_uwb_id' in config:
+            dev_eui_map = config['dev_eui_to_uwb_id']
+            # Normalize keys to uppercase
+            dev_eui_map = {k.upper(): v.upper() for k, v in dev_eui_map.items()}
+            log_verbose(f"Loaded {len(dev_eui_map)} dev_eui to UWB ID mappings")
+    except Exception as e:
+        log_warning(f"Failed to load dev_eui mapping: {e}")
 
-# LoRa Tag Data Cache instance
+# LoRa Tag Data Cache instance (initialize first so converter can use it)
 lora_cache = None
 if args.enable_lora_cache:
     if LoraTagDataCache is None:
         print("[WARNING] --enable-lora-cache requires lora_tag_cache.py module - LoRa caching disabled")
     else:
-        # Get dev_eui mapping from converter if available
-        dev_eui_map = {}
-        if uwb_converter and hasattr(uwb_converter, 'dev_eui_to_uwb_id_map'):
-            dev_eui_map = uwb_converter.dev_eui_to_uwb_id_map
-        
         lora_cache = LoraTagDataCache(
             broker=args.lora_broker,
             port=args.lora_port,
@@ -132,6 +133,19 @@ if args.enable_lora_cache:
         )
         lora_cache.start()
         log_info("LoRa tag data cache enabled and started")
+
+# UWB Network Converter instance (for CGA format)
+# Initialize after lora_cache so it can be passed to converter
+uwb_converter = None
+if args.cga_format:
+    if UwbNetworkConverter is None:
+        print("[ERROR] --cga-format requires uwb_network_converter.py module")
+        sys.exit(1)
+    uwb_converter = UwbNetworkConverter(
+        anchor_config_path=args.anchor_config, 
+        dev_eui_mapping_path=args.dev_eui_mapping,
+        lora_cache=lora_cache  # Pass LoRa cache to converter
+    )
 
 # Error tracking globals
 parsing_error_count = 0

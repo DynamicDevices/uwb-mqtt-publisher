@@ -27,7 +27,7 @@ class UwbNetworkConverter:
         network_json = converter.convert_edges_to_network(edge_list)
     """
     
-    def __init__(self, anchor_config_path=None, dev_eui_mapping_path=None):
+    def __init__(self, anchor_config_path=None, dev_eui_mapping_path=None, lora_cache=None):
         """
         Initialize the converter with anchor point configuration.
         
@@ -38,9 +38,12 @@ class UwbNetworkConverter:
             dev_eui_mapping_path (str, optional): Path to JSON config file with dev_eui to UWB ID mappings.
                 Format: {"dev_eui_to_uwb_id": {"F4CE36E6CD722E97": "8FA4", ...}}
                 If None, no dev_eui mappings will be configured.
+            lora_cache (LoraTagDataCache, optional): LoRa tag data cache instance.
+                If provided, LoRa data (battery, GPS, temperature, etc.) will be included in CGA format.
         """
         self.anchor_config_path = anchor_config_path
         self.dev_eui_mapping_path = dev_eui_mapping_path
+        self.lora_cache = lora_cache
         self.anchor_map = {}  # Maps anchor ID to [lat, lon, alt]
         self.dev_eui_to_uwb_id_map = {}  # Maps dev_eui (hex string) to UWB ID (hex string)
         
@@ -134,16 +137,80 @@ class UwbNetworkConverter:
             is_anchor = uwb_id in self.anchor_map
             anchor_position = self.anchor_map.get(uwb_id, [0.0, 0.0, 0.0])
             
+            # Try to get LoRa data for this UWB ID
+            lora_data = None
+            if self.lora_cache:
+                try:
+                    lora_data = self.lora_cache.get_by_uwb_id(uwb_id)
+                except Exception as e:
+                    # Silently fail if cache lookup fails
+                    pass
+            
+            # Determine position - prefer LoRa GPS, then anchor position
+            position_known = is_anchor
+            lat_lon_alt = anchor_position if is_anchor else [0.0, 0.0, 0.0]
+            
+            if lora_data and lora_data.get("location"):
+                loc = lora_data["location"]
+                if loc.get("latitude") and loc.get("longitude"):
+                    lat_lon_alt = [
+                        loc.get("latitude", 0.0),
+                        loc.get("longitude", 0.0),
+                        loc.get("altitude", 0.0)
+                    ]
+                    position_known = True
+            
             uwb = {
                 "id": uwb_id,
                 "triageStatus": 0,  # unknown/not triaged
                 "position": {"x": 0.0, "y": 0.0, "z": 0.0},
-                "latLonAlt": anchor_position if is_anchor else [0.0, 0.0, 0.0],
-                "positionKnown": is_anchor,
+                "latLonAlt": lat_lon_alt,
+                "positionKnown": position_known,
                 "lastPositionUpdateTime": timestamp,
                 "edges": [],
                 "positionAccuracy": 0.0
             }
+            
+            # Add LoRa metadata if available
+            if lora_data:
+                # Add decoded payload fields (battery, temperature, etc.)
+                decoded = lora_data.get("decoded_payload", {})
+                if decoded:
+                    # Add common fields that might be in decoded payload
+                    if "battery" in decoded:
+                        uwb["battery"] = decoded["battery"]
+                    if "temperature" in decoded:
+                        uwb["temperature"] = decoded["temperature"]
+                    if "humidity" in decoded:
+                        uwb["humidity"] = decoded["humidity"]
+                    # Add any other decoded fields
+                    for key, value in decoded.items():
+                        if key not in ["battery", "temperature", "humidity"]:
+                            uwb[f"lora_{key}"] = value
+                
+                # Add location accuracy if available
+                if lora_data.get("location", {}).get("accuracy"):
+                    uwb["positionAccuracy"] = lora_data["location"]["accuracy"]
+                
+                # Add RX metadata (gateway info, RSSI, SNR)
+                rx_metadata = lora_data.get("rx_metadata", [])
+                if rx_metadata:
+                    # Use the best RSSI/SNR from all gateways
+                    best_rssi = None
+                    best_snr = None
+                    for rx in rx_metadata:
+                        if rx.get("rssi") is not None:
+                            if best_rssi is None or rx["rssi"] > best_rssi:
+                                best_rssi = rx["rssi"]
+                        if rx.get("snr") is not None:
+                            if best_snr is None or rx["snr"] > best_snr:
+                                best_snr = rx["snr"]
+                    
+                    if best_rssi is not None:
+                        uwb["rssi"] = best_rssi
+                    if best_snr is not None:
+                        uwb["snr"] = best_snr
+            
             uwbs.append(uwb)
         
         # Create a map for quick lookup
