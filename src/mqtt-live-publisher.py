@@ -324,6 +324,16 @@ def main():
                                 
                                 if payload[0] == 4:
                                     # Distance measurement packet
+                                    # Check if we have valid assignments from a previous type 2 packet
+                                    if not assignments or len(assignments) != 3:
+                                        logger.warning(f"Distance packet received but no valid assignments (assignments={assignments}), skipping")
+                                        continue
+                                    
+                                    # Verify assignments structure
+                                    if not all(isinstance(g, list) and len(g) > 0 for g in assignments):
+                                        logger.warning(f"Invalid assignments structure: {assignments}, skipping distance packet")
+                                        continue
+                                    
                                     tof_count = g1 * g2 + g1 * g3 + g2 * g3
                                     if mode & 1:
                                         tof_count = tof_count + g1 * (g1-1) / 2
@@ -343,6 +353,8 @@ def main():
                                         assignments[2][g3 - unassigned_count + i] = id
                                     
                                     # Parse final payload
+                                    # Log assignment details for debugging
+                                    logger.verbose(f"Parsing final payload: assignments={assignments}, payload_len={len(payload[idx:])}, mode={mode}, idx={idx}")
                                     results = uwb_packet_parser.parse_final_payload(
                                         assignments,
                                         bytes(payload[idx:]),

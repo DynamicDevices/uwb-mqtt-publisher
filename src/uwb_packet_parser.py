@@ -30,6 +30,26 @@ def parse_final_payload(assignments, final_payload, mode=0, error_handler=None):
     if len(final_payload) == 0:
         return results
 
+    # Validate assignments structure
+    if not isinstance(assignments, list) or len(assignments) != 3:
+        error_msg = f"Invalid assignments structure: expected list of 3 groups, got {type(assignments)} with length {len(assignments) if isinstance(assignments, list) else 'N/A'}"
+        if error_handler:
+            error_handler(error_msg)
+        return results
+
+    # Check if any assignment group is empty or invalid
+    for i, group in enumerate(assignments):
+        if not isinstance(group, list):
+            error_msg = f"Assignment group {i} is not a list: {type(group)}"
+            if error_handler:
+                error_handler(error_msg)
+            return results
+        if len(group) == 0:
+            error_msg = f"Assignment group {i} is empty"
+            if error_handler:
+                error_handler(error_msg)
+            return results
+
     try:
         idx = 0
 
