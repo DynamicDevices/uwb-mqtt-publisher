@@ -51,6 +51,8 @@ class UwbNetworkConverter:
                 If provided, LoRa data (battery, GPS, temperature, etc.) will be included in CGA format.
             data_validator (DataValidator, optional): Data validator instance.
                 If provided, GPS, battery, and temperature data will be validated.
+            confidence_scorer (ConfidenceScorer, optional): Confidence scorer instance.
+                If provided, position confidence scores will be calculated and added to CGA format.
         """
         self.anchor_config_path = anchor_config_path
         self.dev_eui_mapping_path = dev_eui_mapping_path
