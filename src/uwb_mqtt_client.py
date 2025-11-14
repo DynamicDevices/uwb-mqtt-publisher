@@ -21,14 +21,14 @@ class UwbMqttClient:
     """MQTT client for publishing UWB data and receiving commands."""
 
     def __init__(
-        self, 
-        broker: str, 
-        port: int, 
-        topic: str, 
-        rate_limit: float = 10.0, 
+        self,
+        broker: str,
+        port: int,
+        topic: str,
+        rate_limit: float = 10.0,
         command_topic: Optional[str] = None,
-        verbose: bool = False, 
-        quiet: bool = False, 
+        verbose: bool = False,
+        quiet: bool = False,
         disable_mqtt: bool = False
     ) -> None:
         """
@@ -65,11 +65,11 @@ class UwbMqttClient:
             print(f"[{level}] {message}")
 
     def _on_connect(
-        self, 
-        client: mqtt.Client, 
-        userdata: Any, 
-        flags: Dict[str, int], 
-        rc: int
+        self,
+        client: mqtt.Client,
+        userdata: Any,
+        flags: Any,
+        rc: Any
     ) -> None:
         """MQTT connection callback."""
         if rc == 0:
@@ -83,10 +83,10 @@ class UwbMqttClient:
             self._log(f"Failed to connect to MQTT broker (rc={rc})", "ERROR")
 
     def _on_disconnect(
-        self, 
-        client: mqtt.Client, 
-        userdata: Any, 
-        rc: int
+        self,
+        client: mqtt.Client,
+        userdata: Any,
+        rc: Any
     ) -> None:
         """MQTT disconnection callback."""
         if rc != 0:
@@ -95,19 +95,19 @@ class UwbMqttClient:
             self._log("Disconnected from MQTT broker", "VERBOSE")
 
     def _on_publish(
-        self, 
-        client: mqtt.Client, 
-        userdata: Any, 
+        self,
+        client: mqtt.Client,
+        userdata: Any,
         mid: int
     ) -> None:
         """MQTT publish callback."""
         self._log(f"Message {mid} published successfully", "VERBOSE")
 
     def _on_log(
-        self, 
-        client: mqtt.Client, 
-        userdata: Any, 
-        level: int, 
+        self,
+        client: mqtt.Client,
+        userdata: Any,
+        level: int,
         buf: str
     ) -> None:
         """MQTT log callback."""
@@ -115,9 +115,9 @@ class UwbMqttClient:
             print(f"[MQTT LOG] {buf}")
 
     def _on_message(
-        self, 
-        client: mqtt.Client, 
-        userdata: Any, 
+        self,
+        client: mqtt.Client,
+        userdata: Any,
         message: mqtt.MQTTMessage
     ) -> None:
         """Handle incoming MQTT command messages."""
@@ -154,7 +154,13 @@ class UwbMqttClient:
 
         try:
             self._log("Creating MQTT client instance", "VERBOSE")
-            self.client = mqtt.Client()
+            # Use VERSION1 callback API (VERSION2 has different signatures)
+            # VERSION1 is still supported and works correctly
+            try:
+                self.client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION1)
+            except AttributeError:
+                # Fallback for older paho-mqtt versions
+                self.client = mqtt.Client()
 
             # Set up callbacks
             self.client.on_connect = self._on_connect

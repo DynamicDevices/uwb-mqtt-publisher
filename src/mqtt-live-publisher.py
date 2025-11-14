@@ -55,27 +55,28 @@ except ImportError:
 def parse_arguments() -> argparse.Namespace:
     """Parse command line arguments."""
     parser = argparse.ArgumentParser(description='UWB MQTT Publisher')
-    parser.add_argument("uart", help="uart port to use", type=str, default="/dev/ttyUSB0", nargs='?')
+    parser.add_argument("uart", help="UART port to use (optional if --disable-serial)", type=str, nargs='?')
     parser.add_argument("nodes", help="node lists", type=str, default="[]", nargs='?')
-    parser.add_argument("--mqtt-broker", help="MQTT broker hostname", type=str, default="mqtt.dynamicdevices.co.uk")
-    parser.add_argument("--mqtt-port", help="MQTT broker port", type=int, default=8883)
-    parser.add_argument("--mqtt-topic", help="MQTT topic to publish to", type=str, default="uwb/positions")
+    parser.add_argument("--mqtt-broker", help="MQTT broker hostname for publishing UWB data", type=str, default="mqtt.dynamicdevices.co.uk")
+    parser.add_argument("--mqtt-port", help="MQTT broker port for publishing UWB data", type=int, default=8883)
+    parser.add_argument("--mqtt-topic", help="MQTT topic to publish UWB data to", type=str, default="uwb/positions")
     parser.add_argument("--mqtt-rate-limit", help="Minimum seconds between MQTT publishes", type=float, default=10.0)
-    parser.add_argument("--disable-mqtt", help="Disable MQTT publishing", action="store_true")
+    parser.add_argument("--disable-publish-mqtt", help="Disable MQTT publishing of UWB data (LoRa MQTT is separate)", action="store_true")
+    parser.add_argument("--disable-mqtt", help="Alias for --disable-publish-mqtt (deprecated, use --disable-publish-mqtt)", action="store_true")
     parser.add_argument("--verbose", help="Enable verbose logging", action="store_true")
     parser.add_argument("--quiet", help="Enable quiet mode (minimal logging)", action="store_true")
     parser.add_argument("--cga-format", help="Publish in CGA network format", action="store_true")
     parser.add_argument("--anchor-config", help="Path to anchor config JSON", type=str, default=None)
     parser.add_argument("--dev-eui-mapping", help="Path to dev_eui mapping JSON", type=str, default=None)
-    parser.add_argument("--lora-broker", help="LoRa MQTT broker hostname", type=str, default="eu1.cloud.thethings.network")
-    parser.add_argument("--lora-port", help="LoRa MQTT broker port", type=int, default=8883)
-    parser.add_argument("--lora-username", help="LoRa MQTT username", type=str, default=None)
-    parser.add_argument("--lora-password", help="LoRa MQTT password", type=str, default=None)
-    parser.add_argument("--lora-topic", help="LoRa MQTT topic pattern", type=str, default="#")
-    parser.add_argument("--enable-lora-cache", help="Enable LoRa tag data caching", action="store_true")
+    parser.add_argument("--lora-broker", help="LoRa MQTT broker hostname (TTN)", type=str, default="eu1.cloud.thethings.network")
+    parser.add_argument("--lora-port", help="LoRa MQTT broker port (TTN, typically 8883)", type=int, default=8883)
+    parser.add_argument("--lora-username", help="LoRa MQTT username (TTN application ID)", type=str, default=None)
+    parser.add_argument("--lora-password", help="LoRa MQTT password (TTN API key)", type=str, default=None)
+    parser.add_argument("--lora-topic", help="LoRa MQTT topic pattern (TTN format: v3/<app-id>/devices/+/up)", type=str, default="#")
+    parser.add_argument("--enable-lora-cache", help="Enable LoRa tag data caching from TTN", action="store_true")
     parser.add_argument("--lora-gps-max-age", help="Maximum age for LoRa GPS data in seconds (default: 300)", type=float, default=300.0)
     parser.add_argument("--lora-sensor-max-age", help="Maximum age for LoRa sensor data in seconds (default: 600)", type=float, default=600.0)
-    parser.add_argument("--disable-serial", help="Disable serial port reading", action="store_true")
+    parser.add_argument("--disable-serial", help="Disable serial port reading (UART argument not required when enabled)", action="store_true")
     parser.add_argument("--parsing-error-threshold", help="Max parsing errors before reset (default: 3)", type=int, default=MAX_PARSING_ERRORS)
     parser.add_argument("--connection-error-threshold", help="Max connection errors before reset (default: 3)", type=int, default=DEFAULT_CONNECTION_ERROR_THRESHOLD)
     parser.add_argument("--backoff-initial", help="Initial backoff delay in seconds (default: 1.0)", type=float, default=DEFAULT_INITIAL_BACKOFF_SECONDS)
@@ -325,7 +326,7 @@ def main() -> None:
 
     # Update health monitor with LoRa cache status
     if lora_cache:
-        health_monitor.update_connection_status(lora_cache_connected=True)
+        health_monitor.update_connection_status(serial_connected=False, lora_cache_connected=True)
 
     # Initialize data validator if enabled
     data_validator = None

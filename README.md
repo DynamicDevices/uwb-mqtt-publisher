@@ -50,9 +50,25 @@ python3 src/mqtt-live-publisher.py /dev/ttyUSB0 \
     --lora-port 8883 \
     --lora-username inst-external-tags@ttn \
     --lora-password <password> \
-    --lora-topic "#" \
+    --lora-topic "v3/inst-external-tags/devices/+/up" \
     --lora-gps-max-age 300 \
     --lora-sensor-max-age 600
+```
+
+**Note**: There are two separate MQTT connections:
+- **UWB MQTT** (`--mqtt-broker`): For publishing UWB position data (can be disabled with `--disable-publish-mqtt`)
+- **LoRa MQTT** (`--lora-broker`): For receiving LoRa tag data from TTN (separate connection)
+
+If serial port is disabled (`--disable-serial`), the UART port argument is optional:
+```bash
+python3 src/mqtt-live-publisher.py \
+    --disable-serial \
+    --enable-lora-cache \
+    --lora-broker eu1.cloud.thethings.network \
+    --lora-port 8883 \
+    --lora-username inst-external-tags@ttn \
+    --lora-password <password> \
+    --lora-topic "v3/inst-external-tags/devices/+/up"
 ```
 
 ### New Options

@@ -90,8 +90,8 @@ class LoraTagDataCache:
         self,
         client: mqtt.Client,
         userdata: Any,
-        flags: Dict[str, int],
-        rc: int
+        flags: Any,
+        rc: Any
     ) -> None:
         """MQTT connection callback"""
         if rc == 0:
@@ -108,7 +108,7 @@ class LoraTagDataCache:
         self,
         client: mqtt.Client,
         userdata: Any,
-        rc: int
+        rc: Any
     ) -> None:
         """MQTT disconnection callback"""
         if rc != 0:
@@ -276,7 +276,13 @@ class LoraTagDataCache:
     def _run(self) -> None:
         """Run the MQTT client loop"""
         try:
-            self.mqtt_client = mqtt.Client()
+            # Use VERSION1 callback API (VERSION2 has different signatures)
+            # VERSION1 is still supported and works correctly
+            try:
+                self.mqtt_client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION1)
+            except AttributeError:
+                # Fallback for older paho-mqtt versions
+                self.mqtt_client = mqtt.Client()
             self.mqtt_client.on_connect = self._on_connect
             self.mqtt_client.on_disconnect = self._on_disconnect
             self.mqtt_client.on_message = self._on_message

@@ -7,7 +7,7 @@ Parses UWB packets from serial port and extracts distance measurements.
 import struct
 from typing import List, Optional, Callable, Union
 from uwb_constants import (
-    TWR_TO_METERS, 
+    TWR_TO_METERS,
     MAX_DISTANCE_METERS,
     MODE_GROUP1_INTERNAL,
     MODE_GROUP2_INTERNAL
@@ -18,10 +18,10 @@ from uwb_exceptions import ResetRequiredException
 def twr_value_ok(value: int) -> bool:
     """
     Check if TWR value is valid.
-    
+
     Args:
         value: TWR value to validate
-        
+
     Returns:
         True if value is valid (positive and within max distance)
     """
@@ -29,9 +29,9 @@ def twr_value_ok(value: int) -> bool:
 
 
 def parse_final_payload(
-    assignments: List[List[int]], 
-    final_payload: bytes, 
-    mode: int = 0, 
+    assignments: List[List[int]],
+    final_payload: bytes,
+    mode: int = 0,
     error_handler: Optional[Callable[[str], bool]] = None
 ) -> List[List[Union[int, float]]]:
     """
@@ -41,7 +41,7 @@ def parse_final_payload(
         assignments: List of three assignment groups [[group1], [group2], [group3]]
         final_payload: Binary payload data
         mode: Mode flags (bit 0 = group1 internal, bit 1 = group2 internal)
-        error_handler: Function to call on parsing errors (optional). 
+        error_handler: Function to call on parsing errors (optional).
                       Should return True if reset is required.
 
     Returns:
