@@ -127,7 +127,8 @@ class LoraTagDataCache:
             topic = message.topic
             payload = message.payload.decode('utf-8')
 
-            self._log(f"Received message on topic: {topic}", "VERBOSE")
+            self._log(f"Received message on topic: {topic}", "INFO")
+            self._log(f"Message payload (first 500 chars): {payload[:500]}", "VERBOSE")
 
             # Parse JSON payload
             data = json.loads(payload)
@@ -149,8 +150,13 @@ class LoraTagDataCache:
             try:
                 uplink_msg = data.get("uplink_message", {})
                 decoded_payload = uplink_msg.get("decoded_payload", {})
-            except (AttributeError, KeyError):
-                pass
+                if decoded_payload:
+                    self._log(f"Decoded payload keys: {list(decoded_payload.keys())}", "VERBOSE")
+                    self._log(f"Decoded payload: {json.dumps(decoded_payload)}", "VERBOSE")
+                else:
+                    self._log("No decoded_payload in uplink_message", "VERBOSE")
+            except (AttributeError, KeyError) as e:
+                self._log(f"Error extracting decoded_payload: {e}", "VERBOSE")
 
             # Extract location data
             # TTN provides locations in multiple formats: "frm-payload", "user", "gps", etc.
@@ -181,8 +187,20 @@ class LoraTagDataCache:
                         "accuracy": loc.get("accuracy"),
                         "source": loc.get("source") or location_source
                     }
-            except (AttributeError, KeyError):
-                pass
+                    self._log(
+                        f"Extracted location from {location_source}: "
+                        f"lat={location_data['latitude']:.6f}, "
+                        f"lon={location_data['longitude']:.6f}, "
+                        f"alt={location_data.get('altitude', 'N/A')}, "
+                        f"accuracy={location_data.get('accuracy', 'N/A')}m",
+                        "VERBOSE"
+                    )
+                elif locations:
+                    self._log(f"No valid location found in {list(locations.keys())}", "VERBOSE")
+                else:
+                    self._log("No location data in message", "VERBOSE")
+            except (AttributeError, KeyError) as e:
+                self._log(f"Error extracting location: {e}", "VERBOSE")
 
             # Extract metadata
             metadata = {
@@ -230,7 +248,74 @@ class LoraTagDataCache:
                     # Normalize UWB ID to uppercase hex string
                     uwb_id = uwb_id.upper()
                     self._uwb_cache[uwb_id] = cached_data
-                    self._log(f"Cached data for dev_eui={dev_eui} -> UWB ID={uwb_id}", "VERBOSE")
+
+                    # Build detailed log message with GPS, battery, and triage status
+                    log_parts = [f"Cached data for dev_eui={dev_eui} -> UWB ID={uwb_id}"]
+
+                    # Add GPS position/status
+                    if location_data and location_data.get("latitude") and location_data.get("longitude"):
+                        lat = location_data.get("latitude")
+                        lon = location_data.get("longitude")
+                        alt = location_data.get("altitude", "N/A")
+                        accuracy = location_data.get("accuracy", "N/A")
+                        source = location_data.get("source", "unknown")
+                        log_parts.append(f"GPS: ({lat:.6f}, {lon:.6f}, alt={alt}) accuracy={accuracy}m source={source}")
+                    else:
+                        log_parts.append("GPS: no position")
+
+                    # Add battery status (check multiple possible field names)
+                    battery = None
+                    if decoded_payload:
+                        battery = decoded_payload.get("battery") or decoded_payload.get("battery_percentage")
+                    if battery is not None:
+                        log_parts.append(f"battery={battery}%")
+                    else:
+                        log_parts.append("battery=N/A")
+
+                    # Add triage status (check multiple possible field names)
+                    triage = None
+                    if decoded_payload:
+                        triage = decoded_payload.get("triage") or decoded_payload.get("triageStatus") or decoded_payload.get("triage_status")
+                    if triage is not None:
+                        log_parts.append(f"triage={triage}")
+                    else:
+                        log_parts.append("triage=N/A")
+
+                    # Add GPS quality indicators (fix_type, satellites)
+                    if decoded_payload:
+                        fix_type = decoded_payload.get("fix_type")
+                        satellites = decoded_payload.get("satellites")
+                        if fix_type is not None:
+                            fix_names = {0: "no_fix", 1: "2D", 2: "3D"}
+                            fix_name = fix_names.get(fix_type, f"unknown({fix_type})")
+                            log_parts.append(f"GPS_fix={fix_name}")
+                        if satellites is not None:
+                            log_parts.append(f"satellites={satellites}")
+
+                    # Add temperature if available
+                    if decoded_payload and "temperature" in decoded_payload:
+                        temp = decoded_payload["temperature"]
+                        log_parts.append(f"temp={temp}°C")
+
+                    # Add signal quality (gateway count, RSSI, SNR)
+                    if rx_metadata:
+                        gateway_count = len(rx_metadata)
+                        log_parts.append(f"gateways={gateway_count}")
+                        # Calculate average RSSI and SNR
+                        rssi_values = [rx.get("rssi") for rx in rx_metadata if rx.get("rssi") is not None]
+                        snr_values = [rx.get("snr") for rx in rx_metadata if rx.get("snr") is not None]
+                        if rssi_values:
+                            avg_rssi = sum(rssi_values) / len(rssi_values)
+                            log_parts.append(f"RSSI={avg_rssi:.1f}dBm")
+                        if snr_values:
+                            avg_snr = sum(snr_values) / len(snr_values)
+                            log_parts.append(f"SNR={avg_snr:.1f}dB")
+
+                    # Add frame counter for message sequence tracking
+                    if metadata.get("f_cnt") is not None:
+                        log_parts.append(f"f_cnt={metadata['f_cnt']}")
+
+                    self._log(" | ".join(log_parts), "INFO")
                 else:
                     self._log(f"No UWB mapping for dev_eui={dev_eui}", "VERBOSE")
 

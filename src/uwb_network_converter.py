@@ -267,20 +267,21 @@ class UwbNetworkConverter:
                 decoded = lora_data.get("decoded_payload", {})
                 if decoded:
                     # Add common fields that might be in decoded payload
-                    if "battery" in decoded:
-                        uwb["battery"] = decoded["battery"]
+                    # Check for battery (multiple possible field names)
+                    battery = decoded.get("battery") or decoded.get("battery_percentage")
+                    if battery is not None:
+                        uwb["battery"] = battery
                     if "temperature" in decoded:
                         uwb["temperature"] = decoded["temperature"]
                     if "humidity" in decoded:
                         uwb["humidity"] = decoded["humidity"]
-                    # Add triage status if available
-                    if "triage" in decoded or "triageStatus" in decoded:
-                        triage_value = decoded.get("triage") or decoded.get("triageStatus")
-                        if triage_value is not None:
-                            uwb["triageStatus"] = triage_value
+                    # Add triage status if available (check multiple possible field names)
+                    triage_value = decoded.get("triage") or decoded.get("triageStatus") or decoded.get("triage_status")
+                    if triage_value is not None:
+                        uwb["triageStatus"] = triage_value
                     # Add any other decoded fields
                     for key, value in decoded.items():
-                        if key not in ["battery", "temperature", "humidity", "triage", "triageStatus"]:
+                        if key not in ["battery", "battery_percentage", "temperature", "humidity", "triage", "triageStatus", "triage_status"]:
                             uwb[f"lora_{key}"] = value
 
                 # Add location accuracy and source if GPS coordinates were added

@@ -5,6 +5,57 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+## [1.4.2] - 2025-01-14
+
+### Added
+- **Enhanced LoRa Cache Logging**: Comprehensive logging for debugging positioning and caching issues
+  - GPS position details (lat, lon, alt, accuracy, source)
+  - Battery percentage
+  - Triage status
+  - GPS fix type (no_fix, 2D, 3D) and satellite count
+  - Temperature
+  - Signal quality metrics (gateway count, average RSSI, average SNR)
+  - Frame counter (f_cnt) for message sequence tracking
+  - Location extraction logging with source priority
+  - Decoded payload field inspection
+
+### Fixed
+- **LoRa Data Field Names**: Support for multiple field name formats
+  - Battery: `battery` or `battery_percentage`
+  - Triage: `triage`, `triageStatus`, or `triage_status`
+  - Updated both cache logging and network converter to handle all formats
+
+### Changed
+- Cache logging now includes all relevant positioning and quality metrics in a single INFO-level message
+- Verbose logging shows decoded payload structure for debugging
+- Enhanced location extraction logging shows which source was used (frm-payload, user, gps)
+
+## [1.4.1] - 2025-01-14
+
+### Fixed
+- **LoRa Location Extraction**: Fixed location extraction to handle multiple TTN location formats (frm-payload, user, gps, and others)
+- **TTN MQTT Configuration**: Updated docker-compose.yml to use correct TTN v3 topic format (`v3/inst-external-tags@ttn/devices/+/up` instead of `#`)
+- **MQTT Callback API**: Fixed deprecation warnings by using VERSION1 callback API (VERSION2 has incompatible signatures)
+- **SSH Multiplexing**: Added SSH multiplexing to serial forwarding scripts for 12x faster connections
+- **Health Monitor**: Fixed missing `serial_connected` parameter in `update_connection_status()` call
+
+### Added
+- **Serial Port Forwarding Scripts**: Created scripts to forward UWB serial data from target devices to local machine for testing
+  - `scripts/forward-uwb-simple.sh`: Forward serial port from target device using SSH + socat
+  - `scripts/test-with-forwarded-serial.sh`: Complete test setup with forwarding
+  - Both scripts support SSH multiplexing and automatic container management
+
+### Changed
+- **MQTT Options Clarification**: Renamed `--disable-mqtt` to `--disable-publish-mqtt` for clarity (old option still works as alias)
+  - `--disable-publish-mqtt`: Disables UWB data publishing (LoRa MQTT is separate)
+  - `--disable-mqtt`: Deprecated alias for `--disable-publish-mqtt`
+- **UART Port Argument**: Made UART port argument optional when `--disable-serial` is used
+- Improved LoRa location extraction priority: frm-payload > user > gps > first available
+- Enhanced verbose logging for positioning debugging
+- Updated container configuration to use correct TTN topic format
+
 ## [1.4.0] - 2025-01-XX
 
 ### Added

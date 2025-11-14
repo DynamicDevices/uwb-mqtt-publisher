@@ -50,7 +50,7 @@ python3 src/mqtt-live-publisher.py /dev/ttyUSB0 \
     --lora-port 8883 \
     --lora-username inst-external-tags@ttn \
     --lora-password <password> \
-    --lora-topic "v3/inst-external-tags/devices/+/up" \
+    --lora-topic "v3/inst-external-tags@ttn/devices/+/up" \
     --lora-gps-max-age 300 \
     --lora-sensor-max-age 600
 ```
@@ -68,7 +68,7 @@ python3 src/mqtt-live-publisher.py \
     --lora-port 8883 \
     --lora-username inst-external-tags@ttn \
     --lora-password <password> \
-    --lora-topic "v3/inst-external-tags/devices/+/up"
+    --lora-topic "v3/inst-external-tags@ttn/devices/+/up"
 ```
 
 ### New Options
