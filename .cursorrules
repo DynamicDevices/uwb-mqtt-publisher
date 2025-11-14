@@ -1,0 +1,46 @@
+# UWB MQTT Publisher - Development Guidelines
+
+## Pre-Push Checklist
+
+**IMPORTANT**: Before pushing any changes to the remote repository, ensure the following are updated:
+
+1. **Documentation**:
+   - Update README.md with new features, options, and usage examples
+   - Update CHANGELOG.md with version, date, and detailed change descriptions
+   - Update any relevant documentation files (TESTING.md, CONTRIBUTING.md, etc.)
+
+2. **Mermaid Flow Diagrams**:
+   - Update PROGRAM_FLOW.md with new components and flows
+   - Ensure all mermaid diagrams reflect current architecture
+   - Add new diagrams for new features if needed
+   - Verify diagrams accurately represent the code flow
+
+3. **Context and Summary**:
+   - Update any context files or summaries with new features
+   - Ensure version numbers are consistent across all files
+   - Update project structure documentation if new modules are added
+
+4. **Code Quality**:
+   - All files must compile without errors
+   - All linting checks must pass
+   - Type hints should be present where applicable
+   - Docstrings should be complete and accurate
+
+## Version Management
+
+- Update `src/__version__.py` with new version number
+- Use semantic versioning (MAJOR.MINOR.PATCH)
+- Include git commit hash in version string
+- Update version in all relevant documentation
+
+## Commit Messages
+
+- Use conventional commit format: `feat:`, `fix:`, `docs:`, `refactor:`, etc.
+- Include issue/priority references when applicable
+- Be descriptive about what changed and why
+
+## Testing
+
+- Test new features before committing
+- Verify integration with existing components
+- Check that all command-line options work correctly
