@@ -97,11 +97,19 @@ sequenceDiagram
             alt CGA Format Enabled
                 Main->>Converter: convert_edges_to_network(edge_list)
                 Converter->>Converter: Map UWB IDs to anchors<br/>Set anchor coordinates
-                Converter->>LoRaCache: Query cached LoRa data<br/>for each UWB ID
+                Converter->>LoRaCache: Query cached LoRa data<br/>for each UWB ID<br/>(with staleness check)
                 LoRaCache-->>Converter: Cached data:<br/>GPS, battery, triage,<br/>timestamps, RSSI, SNR, etc.
-                Converter->>Converter: Add LoRa GPS only if<br/>UWB has no coordinates
+                alt Data Validation Enabled
+                    Converter->>Validator: Validate GPS coordinates<br/>battery, temperature
+                    Validator-->>Converter: Validation result
+                end
+                Converter->>Converter: Add LoRa GPS only if<br/>UWB has no coordinates<br/>(and validated)
+                alt Confidence Scoring Enabled
+                    Converter->>ConfidenceScorer: Calculate position confidence<br/>based on source, age, quality
+                    ConfidenceScorer-->>Converter: Confidence score (0.0-1.0)
+                end
                 Converter->>Converter: Add LoRa metadata:<br/>timestamps, battery, triage,<br/>gateway count, frame counter
-                Converter->>Converter: Set positionSource<br/>(anchor_config or lora source)
+                Converter->>Converter: Set positionSource<br/>positionAccuracy<br/>and positionConfidence
                 Converter->>Converter: Build network JSON<br/>with all metadata
                 Converter-->>Main: CGA network format JSON
             else Simple Format
@@ -147,6 +155,10 @@ graph LR
         Parser[Packet Parser<br/>parse_final]
         Converter[UWB Network Converter<br/>uwb_network_converter.py]
         Cache[LoRa Tag Cache<br/>lora_tag_cache.py]
+        ErrorRecovery[Error Recovery<br/>uwb_error_recovery.py]
+        HealthMonitor[Health Monitor<br/>uwb_health_monitor.py]
+        Validator[Data Validator<br/>uwb_data_validator.py]
+        ConfidenceScorer[Confidence Scorer<br/>uwb_confidence_scorer.py]
     end
     
     subgraph "Output"
