@@ -7,7 +7,7 @@ __version__ = "1.4.1"
 __version_info__ = (1, 4, 1)
 
 # Git commit hash (will be updated on commit)
-__git_hash__ = "36ff303"
+__git_hash__ = "72d893c"
 
 
 def get_version():

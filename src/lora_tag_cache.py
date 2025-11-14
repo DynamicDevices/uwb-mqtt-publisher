@@ -253,15 +253,23 @@ class LoraTagDataCache:
                     log_parts = [f"Cached data for dev_eui={dev_eui} -> UWB ID={uwb_id}"]
 
                     # Add GPS position/status
+                    # Note: Location source can be from device GPS (frm-payload) or TTN location service (gps, user)
                     if location_data and location_data.get("latitude") and location_data.get("longitude"):
                         lat = location_data.get("latitude")
                         lon = location_data.get("longitude")
                         alt = location_data.get("altitude", "N/A")
                         accuracy = location_data.get("accuracy", "N/A")
                         source = location_data.get("source", "unknown")
-                        log_parts.append(f"GPS: ({lat:.6f}, {lon:.6f}, alt={alt}) accuracy={accuracy}m source={source}")
+                        # Clarify if source is from device or TTN service
+                        if source == "SOURCE_GPS" or source == "gps":
+                            source_label = f"{source}(TTN_service)"
+                        elif source == "frm-payload":
+                            source_label = f"{source}(device)"
+                        else:
+                            source_label = source
+                        log_parts.append(f"location: ({lat:.6f}, {lon:.6f}, alt={alt}) accuracy={accuracy}m source={source_label}")
                     else:
-                        log_parts.append("GPS: no position")
+                        log_parts.append("location: no position")
 
                     # Add battery status (check multiple possible field names)
                     battery = None
@@ -281,16 +289,18 @@ class LoraTagDataCache:
                     else:
                         log_parts.append("triage=N/A")
 
-                    # Add GPS quality indicators (fix_type, satellites)
+                    # Add device GPS quality indicators (fix_type, satellites)
+                    # Note: This is the device's own GPS module status, which may differ from
+                    # the location source (which could be from TTN's location service)
                     if decoded_payload:
                         fix_type = decoded_payload.get("fix_type")
                         satellites = decoded_payload.get("satellites")
                         if fix_type is not None:
                             fix_names = {0: "no_fix", 1: "2D", 2: "3D"}
                             fix_name = fix_names.get(fix_type, f"unknown({fix_type})")
-                            log_parts.append(f"GPS_fix={fix_name}")
+                            log_parts.append(f"device_GPS_fix={fix_name}")
                         if satellites is not None:
-                            log_parts.append(f"satellites={satellites}")
+                            log_parts.append(f"device_satellites={satellites}")
 
                     # Add temperature if available
                     if decoded_payload and "temperature" in decoded_payload:
