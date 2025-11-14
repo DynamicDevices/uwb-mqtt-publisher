@@ -14,6 +14,7 @@ This application reads UWB positioning data from a serial port and publishes it 
 - **Enhanced error recovery**: Exponential backoff, different error thresholds, health monitoring
 - **Health monitoring**: MQTT-based health reporting with connection metrics
 - **Graceful degradation**: Continue with partial data when possible
+- **Data validation**: Configurable sanity checks for distances, GPS, battery, and temperature
 - **Type-safe codebase**: Full type hints throughout
 - Modular architecture for maintainability
 
@@ -70,6 +71,17 @@ python3 src/mqtt-live-publisher.py /dev/ttyUSB0 \
 - `--health-topic TOPIC`: MQTT topic for health reports (default: {mqtt_topic}/health)
 - `--health-interval SECONDS`: Health report interval in seconds (default: 60)
 - `--graceful-degradation`: Continue with partial data when possible
+
+**Data Validation:**
+- `--enable-validation`: Enable data validation and sanity checks
+- `--min-distance METERS`: Minimum valid distance in meters (default: 0.0)
+- `--max-distance METERS`: Maximum valid distance in meters (default: 300.0)
+- `--reject-zero-gps`: Reject GPS coordinates at 0,0 (default: True)
+- `--min-battery PERCENT`: Minimum valid battery percentage (default: 0.0)
+- `--max-battery PERCENT`: Maximum valid battery percentage (default: 100.0)
+- `--min-temperature CELSIUS`: Minimum valid temperature in Celsius (default: -40.0)
+- `--max-temperature CELSIUS`: Maximum valid temperature in Celsius (default: 85.0)
+- `--validation-failures-topic TOPIC`: MQTT topic for validation failures (default: {mqtt_topic}/validation_failures)
 
 These options control data staleness filtering, error recovery behavior, and health monitoring. GPS data older than the specified age will be automatically filtered out to prevent using outdated location information.
 

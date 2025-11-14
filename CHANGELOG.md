@@ -5,6 +5,42 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.0] - 2025-01-XX
+
+### Added
+- **Data Validation & Sanity Checks**: Complete Priority 2 data validation system
+  - Configurable validation for UWB distances (min/max range)
+  - GPS coordinate validation (reject 0,0, validate lat/lon ranges)
+  - Battery level validation (configurable min/max percentage)
+  - Temperature validation (configurable min/max Celsius)
+  - Validation failure logging with detailed reasons
+  - Optional MQTT topic for publishing validation failures
+  - `--enable-validation` flag to enable validation
+  - `--min-distance`, `--max-distance` parameters for distance validation
+  - `--reject-zero-gps` flag for GPS validation
+  - `--min-battery`, `--max-battery` parameters for battery validation
+  - `--min-temperature`, `--max-temperature` parameters for temperature validation
+  - `--validation-failures-topic` parameter for validation failure reporting
+  - Integration with network converter for GPS/battery/temperature validation
+  - Validation statistics tracking
+
+- **New Module**:
+  - `src/uwb_data_validator.py`: Data validation with configurable rules
+
+### Changed
+- Network converter now validates GPS, battery, and temperature data when validator is enabled
+- Invalid data is filtered before publishing to prevent bad data propagation
+
+### Technical Details
+- Distance validation checks: `min_distance <= distance <= max_distance`
+- GPS validation checks: latitude [-90, 90], longitude [-180, 180], rejects 0,0 by default
+- Battery validation checks: `min_battery <= battery <= max_battery` (0-100%)
+- Temperature validation checks: `min_temperature <= temp <= max_temperature` (Celsius)
+- Validation failures are logged and optionally published to MQTT topic
+- Validation statistics tracked: total validated, rejection counts by type, rejection rate
+
+---
+
 ## [1.2.0] - 2025-01-XX
 
 ### Added
