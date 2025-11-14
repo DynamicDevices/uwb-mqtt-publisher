@@ -5,14 +5,35 @@ Parses UWB packets from serial port and extracts distance measurements.
 """
 
 import struct
+from typing import List, Optional, Callable, Union
+from uwb_constants import (
+    TWR_TO_METERS, 
+    MAX_DISTANCE_METERS,
+    MODE_GROUP1_INTERNAL,
+    MODE_GROUP2_INTERNAL
+)
+from uwb_exceptions import ResetRequiredException
 
 
-def twr_value_ok(value):
-    """Check if TWR value is valid."""
-    return value > 0 and 0.004690384 * value < 300
+def twr_value_ok(value: int) -> bool:
+    """
+    Check if TWR value is valid.
+    
+    Args:
+        value: TWR value to validate
+        
+    Returns:
+        True if value is valid (positive and within max distance)
+    """
+    return value > 0 and TWR_TO_METERS * value < MAX_DISTANCE_METERS
 
 
-def parse_final_payload(assignments, final_payload, mode=0, error_handler=None):
+def parse_final_payload(
+    assignments: List[List[int]], 
+    final_payload: bytes, 
+    mode: int = 0, 
+    error_handler: Optional[Callable[[str], bool]] = None
+) -> List[List[Union[int, float]]]:
     """
     Parse final payload and extract distance measurements.
 
@@ -20,7 +41,8 @@ def parse_final_payload(assignments, final_payload, mode=0, error_handler=None):
         assignments: List of three assignment groups [[group1], [group2], [group3]]
         final_payload: Binary payload data
         mode: Mode flags (bit 0 = group1 internal, bit 1 = group2 internal)
-        error_handler: Function to call on parsing errors (optional)
+        error_handler: Function to call on parsing errors (optional). 
+                      Should return True if reset is required.
 
     Returns:
         List of edges in format [[node1, node2, distance], ...]
@@ -61,7 +83,7 @@ def parse_final_payload(assignments, final_payload, mode=0, error_handler=None):
                 value = struct.unpack('<H', final_payload[idx:(idx + 2)])[0]
                 idx += 2
                 if twr_value_ok(value):
-                    results.append([assignments[0][i], assignments[1][j], 0.004690384 * value])
+                    results.append([assignments[0][i], assignments[1][j], TWR_TO_METERS * value])
 
         # Group 1 x Group 3
         for i in range(0, len(assignments[0])):
@@ -71,7 +93,7 @@ def parse_final_payload(assignments, final_payload, mode=0, error_handler=None):
                 value = struct.unpack('<H', final_payload[idx:(idx + 2)])[0]
                 idx += 2
                 if twr_value_ok(value):
-                    results.append([assignments[0][i], assignments[2][j], 0.004690384 * value])
+                    results.append([assignments[0][i], assignments[2][j], TWR_TO_METERS * value])
 
         # Group 2 x Group 3
         for i in range(0, len(assignments[1])):
@@ -81,10 +103,10 @@ def parse_final_payload(assignments, final_payload, mode=0, error_handler=None):
                 value = struct.unpack('<H', final_payload[idx:(idx + 2)])[0]
                 idx += 2
                 if twr_value_ok(value):
-                    results.append([assignments[1][i], assignments[2][j], 0.004690384 * value])
+                    results.append([assignments[1][i], assignments[2][j], TWR_TO_METERS * value])
 
         # Group 1 internal (if mode bit 0 set)
-        if mode & 1:
+        if mode & MODE_GROUP1_INTERNAL:
             for i in range(0, len(assignments[0])):
                 for j in range(i + 1, len(assignments[0])):
                     if idx + 2 > len(final_payload):
@@ -92,10 +114,10 @@ def parse_final_payload(assignments, final_payload, mode=0, error_handler=None):
                     value = struct.unpack('<H', final_payload[idx:(idx + 2)])[0]
                     idx += 2
                     if twr_value_ok(value):
-                        results.append([assignments[0][i], assignments[0][j], 0.004690384 * value])
+                        results.append([assignments[0][i], assignments[0][j], TWR_TO_METERS * value])
 
         # Group 2 internal (if mode bit 1 set)
-        if mode & 2:
+        if mode & MODE_GROUP2_INTERNAL:
             for i in range(0, len(assignments[1])):
                 for j in range(i + 1, len(assignments[1])):
                     if idx + 2 > len(final_payload):
@@ -103,12 +125,12 @@ def parse_final_payload(assignments, final_payload, mode=0, error_handler=None):
                     value = struct.unpack('<H', final_payload[idx:(idx + 2)])[0]
                     idx += 2
                     if twr_value_ok(value):
-                        results.append([assignments[1][i], assignments[1][j], 0.004690384 * value])
+                        results.append([assignments[1][i], assignments[1][j], TWR_TO_METERS * value])
 
     except (struct.error, ValueError, IndexError) as e:
         if error_handler:
             if error_handler(f"parse_final: {str(e)}"):
-                raise Exception("RESET_REQUIRED")
+                raise ResetRequiredException("Maximum parsing errors reached, reset required")
         else:
             raise
         return []

@@ -13,6 +13,7 @@ import json
 import time
 import os
 from datetime import datetime
+from typing import Optional, Dict, List, Any, Union
 
 
 class UwbNetworkConverter:
@@ -28,7 +29,12 @@ class UwbNetworkConverter:
         network_json = converter.convert_edges_to_network(edge_list)
     """
     
-    def __init__(self, anchor_config_path=None, dev_eui_mapping_path=None, lora_cache=None):
+    def __init__(
+        self, 
+        anchor_config_path: Optional[str] = None, 
+        dev_eui_mapping_path: Optional[str] = None, 
+        lora_cache: Optional[Any] = None
+    ) -> None:
         """
         Initialize the converter with anchor point configuration.
         
@@ -45,8 +51,8 @@ class UwbNetworkConverter:
         self.anchor_config_path = anchor_config_path
         self.dev_eui_mapping_path = dev_eui_mapping_path
         self.lora_cache = lora_cache
-        self.anchor_map = {}  # Maps anchor ID to [lat, lon, alt]
-        self.dev_eui_to_uwb_id_map = {}  # Maps dev_eui (hex string) to UWB ID (hex string)
+        self.anchor_map: Dict[str, List[float]] = {}  # Maps anchor ID to [lat, lon, alt]
+        self.dev_eui_to_uwb_id_map: Dict[str, str] = {}  # Maps dev_eui (hex string) to UWB ID (hex string)
         
         if anchor_config_path and os.path.exists(anchor_config_path):
             self._load_anchor_config()
@@ -58,7 +64,7 @@ class UwbNetworkConverter:
         elif dev_eui_mapping_path:
             print(f"[WARNING] Dev EUI mapping file not found: {dev_eui_mapping_path}")
     
-    def _load_anchor_config(self):
+    def _load_anchor_config(self) -> None:
         """Load anchor point configuration from JSON file."""
         try:
             with open(self.anchor_config_path, 'r') as f:
@@ -87,7 +93,7 @@ class UwbNetworkConverter:
         except Exception as e:
             print(f"[ERROR] Failed to load anchor config: {e}")
     
-    def _load_dev_eui_mapping(self):
+    def _load_dev_eui_mapping(self) -> None:
         """Load dev_eui to UWB ID mapping from separate JSON file."""
         try:
             with open(self.dev_eui_mapping_path, 'r') as f:
@@ -107,7 +113,11 @@ class UwbNetworkConverter:
         except Exception as e:
             print(f"[ERROR] Failed to load dev_eui mapping: {e}")
     
-    def convert_edges_to_network(self, edge_list, timestamp=None):
+    def convert_edges_to_network(
+        self, 
+        edge_list: List[List[Union[str, float]]], 
+        timestamp: Optional[float] = None
+    ) -> Dict[str, Any]:
         """
         Convert edge list to CGA network format.
         
@@ -144,16 +154,24 @@ class UwbNetworkConverter:
             
             # Only add LoRa GPS coordinates if UWB doesn't already have coordinates (not an anchor)
             if not is_anchor:
-                # Try to get LoRa data for this UWB ID
+                # Try to get LoRa data for this UWB ID (stale data is automatically filtered)
                 lora_data = None
                 if self.lora_cache:
                     try:
-                        lora_data = self.lora_cache.get_by_uwb_id(uwb_id)
+                        lora_data = self.lora_cache.get_by_uwb_id(uwb_id, check_gps_staleness=True)
+                        if lora_data:
+                            # Check if data is getting close to expiration and warn
+                            data_age = time.time() - lora_data.get("timestamp", 0)
+                            if lora_data.get("location"):
+                                # GPS data - warn if > 80% of TTL
+                                gps_ttl = getattr(self.lora_cache, 'gps_ttl_seconds', 300.0)
+                                if data_age > gps_ttl * 0.8:
+                                    print(f"[WARNING] Using GPS data for UWB {uwb_id} that is {data_age:.1f}s old (TTL: {gps_ttl}s)")
                     except Exception as e:
                         # Silently fail if cache lookup fails
                         pass
                 
-                # Add LoRa GPS coordinates if available
+                # Add LoRa GPS coordinates if available (already validated as non-stale)
                 if lora_data and lora_data.get("location"):
                     loc = lora_data["location"]
                     if loc.get("latitude") and loc.get("longitude"):
@@ -171,7 +189,7 @@ class UwbNetworkConverter:
                             try:
                                 dt = datetime.fromisoformat(lora_data["received_at"].replace('Z', '+00:00'))
                                 timestamp = dt.timestamp()
-                            except:
+                            except (ValueError, TypeError):
                                 pass
             else:
                 # For anchors, still check LoRa cache for metadata (battery, etc.) but don't override position
@@ -302,7 +320,11 @@ class UwbNetworkConverter:
         
         return network
     
-    def convert_edges_to_network_json(self, edge_list, timestamp=None):
+    def convert_edges_to_network_json(
+        self, 
+        edge_list: List[List[Union[str, float]]], 
+        timestamp: Optional[float] = None
+    ) -> str:
         """
         Convert edge list to CGA network format and return as JSON string.
         

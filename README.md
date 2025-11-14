@@ -9,6 +9,9 @@ This application reads UWB positioning data from a serial port and publishes it 
 - Integrates LoRa tag data (GPS, battery, triage status) from TTN
 - Configurable anchor points and dev_eui mappings
 - Rate limiting for MQTT publishing
+- **Data quality management**: Automatic staleness filtering for LoRa data
+- **Cache expiration**: Automatic cleanup of expired cache entries
+- **Type-safe codebase**: Full type hints throughout
 - Modular architecture for maintainability
 
 ## Installation
@@ -42,8 +45,17 @@ python3 src/mqtt-live-publisher.py /dev/ttyUSB0 \
     --lora-port 8883 \
     --lora-username inst-external-tags@ttn \
     --lora-password <password> \
-    --lora-topic "#"
+    --lora-topic "#" \
+    --lora-gps-max-age 300 \
+    --lora-sensor-max-age 600
 ```
+
+### New Options
+
+- `--lora-gps-max-age SECONDS`: Maximum age for LoRa GPS data in seconds (default: 300 = 5 minutes)
+- `--lora-sensor-max-age SECONDS`: Maximum age for LoRa sensor data in seconds (default: 600 = 10 minutes)
+
+These options control data staleness filtering. GPS data older than the specified age will be automatically filtered out to prevent using outdated location information.
 
 ## Development
 
@@ -90,7 +102,9 @@ uwb-mqtt-publisher/
 │   ├── uwb_mqtt_client.py         # MQTT client
 │   ├── uwb_logging.py             # Logging utilities
 │   ├── uwb_network_converter.py   # CGA format conversion
-│   └── lora_tag_cache.py          # LoRa data caching
+│   ├── lora_tag_cache.py          # LoRa data caching with expiration
+│   ├── uwb_constants.py           # Centralized constants
+│   └── uwb_exceptions.py          # Custom exception classes
 ├── config/
 │   ├── uwb_anchors.json           # Anchor configuration
 │   ├── uwb_anchors_hw_lab.json   # Hardware lab anchors

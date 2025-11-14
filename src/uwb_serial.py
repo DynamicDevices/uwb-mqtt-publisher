@@ -7,9 +7,10 @@ Handles serial port connection, reading, writing, and device reset.
 import serial
 import time
 import sys
+from typing import Optional, List, Union
 
 
-def connect_serial(uart, verbose=False):
+def connect_serial(uart: str, verbose: bool = False) -> Optional[serial.Serial]:
     """
     Connect to serial port.
 
@@ -43,7 +44,7 @@ def connect_serial(uart, verbose=False):
     return ser
 
 
-def disconnect_serial(ser):
+def disconnect_serial(ser: Optional[serial.Serial]) -> None:
     """Disconnect from serial port."""
     if ser:
         ser.rts = False
@@ -51,7 +52,7 @@ def disconnect_serial(ser):
         ser.is_open = False
 
 
-def flush_rx(ser):
+def flush_rx(ser: serial.Serial) -> bytes:
     """Flush and read all available data from serial port."""
     try:
         n = ser.in_waiting
@@ -64,7 +65,7 @@ def flush_rx(ser):
         return b''
 
 
-def reset_device(ser, verbose=False):
+def reset_device(ser: serial.Serial, verbose: bool = False) -> None:
     """
     Reset the UWB device via DTR line.
 
@@ -79,13 +80,13 @@ def reset_device(ser, verbose=False):
     ser.dtr = False
 
 
-def write_serial(d, data):
+def write_serial(d: serial.Serial, data: Union[List[int], bytes]) -> Optional[int]:
     """Write data to serial port."""
     s = str(bytearray(data)) if sys.version_info < (3,) else bytes(data)
     return d.write(s)
 
 
-def read_serial(d, nbytes):
+def read_serial(d: serial.Serial, nbytes: int) -> List[int]:
     """Read data from serial port."""
     s = d.read(nbytes)
     return [ord(c) for c in s] if type(s) is str else list(s)
