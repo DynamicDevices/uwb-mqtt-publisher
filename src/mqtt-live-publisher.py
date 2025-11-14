@@ -38,6 +38,7 @@ from uwb_exceptions import ResetRequiredException
 from uwb_error_recovery import ErrorRecovery, ErrorType
 from uwb_health_monitor import HealthMonitor
 from uwb_data_validator import DataValidator
+from uwb_confidence_scorer import ConfidenceScorer
 
 # Import optional components
 try:
@@ -92,6 +93,14 @@ def parse_arguments() -> argparse.Namespace:
     parser.add_argument("--min-temperature", help="Minimum valid temperature in Celsius (default: -40.0)", type=float, default=-40.0)
     parser.add_argument("--max-temperature", help="Maximum valid temperature in Celsius (default: 85.0)", type=float, default=85.0)
     parser.add_argument("--validation-failures-topic", help="MQTT topic for validation failures (default: {mqtt_topic}/validation_failures)", type=str, default=None)
+    parser.add_argument("--enable-confidence-scoring", help="Enable position confidence scoring", action="store_true")
+    parser.add_argument("--anchor-confidence", help="Confidence score for anchor points (default: 1.0)", type=float, default=1.0)
+    parser.add_argument("--lora-gps-base-confidence", help="Base confidence for LoRa GPS data (default: 0.7)", type=float, default=0.7)
+    parser.add_argument("--lora-gps-min-confidence", help="Minimum confidence for LoRa GPS data (default: 0.3)", type=float, default=0.3)
+    parser.add_argument("--lora-gps-decay-rate", help="Confidence decay rate per TTL period (default: 0.1)", type=float, default=0.1)
+    parser.add_argument("--gps-accuracy-weight", help="Weight for GPS accuracy in confidence (default: 0.2)", type=float, default=0.2)
+    parser.add_argument("--gateway-count-weight", help="Weight for gateway count in confidence (default: 0.1)", type=float, default=0.1)
+    parser.add_argument("--rssi-weight", help="Weight for RSSI/SNR in confidence (default: 0.1)", type=float, default=0.1)
     return parser.parse_args()
 
 
@@ -276,7 +285,9 @@ def main() -> None:
         uwb_converter = UwbNetworkConverter(
             anchor_config_path=args.anchor_config,
             dev_eui_mapping_path=args.dev_eui_mapping,
-            lora_cache=lora_cache
+            lora_cache=lora_cache,
+            data_validator=None,  # Will be set after validator is created
+            confidence_scorer=None  # Will be set after scorer is created
         )
 
     # Initialize error recovery system
@@ -335,9 +346,32 @@ def main() -> None:
         data_validator.validation_failures_topic = validation_failures_topic
         logger.info(f"Data validation enabled (distance: {args.min_distance}-{args.max_distance}m, GPS: reject_zero={args.reject_zero_gps})")
 
-        # Pass validator to network converter if it exists
+        # Initialize confidence scorer if enabled
+        confidence_scorer = None
+        if args.enable_confidence_scoring:
+            confidence_scorer = ConfidenceScorer(
+                logger=logger,
+                anchor_confidence=args.anchor_confidence,
+                lora_gps_base_confidence=args.lora_gps_base_confidence,
+                lora_gps_min_confidence=args.lora_gps_min_confidence,
+                lora_gps_decay_rate=args.lora_gps_decay_rate,
+                gps_accuracy_weight=args.gps_accuracy_weight,
+                gateway_count_weight=args.gateway_count_weight,
+                rssi_weight=args.rssi_weight,
+                verbose=args.verbose
+            )
+            logger.info(
+                f"Position confidence scoring enabled "
+                f"(anchor: {args.anchor_confidence}, "
+                f"LoRa GPS: {args.lora_gps_min_confidence}-{args.lora_gps_base_confidence})"
+            )
+
+        # Pass validator and scorer to network converter if they exist
         if uwb_converter:
-            uwb_converter.data_validator = data_validator
+            if data_validator:
+                uwb_converter.data_validator = data_validator
+            if confidence_scorer:
+                uwb_converter.confidence_scorer = confidence_scorer
 
     # Initialize packet processor with error recovery, health monitoring, and validation
     processor = PacketProcessor(

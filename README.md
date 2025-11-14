@@ -15,6 +15,7 @@ This application reads UWB positioning data from a serial port and publishes it 
 - **Health monitoring**: MQTT-based health reporting with connection metrics
 - **Graceful degradation**: Continue with partial data when possible
 - **Data validation**: Configurable sanity checks for distances, GPS, battery, and temperature
+- **Position confidence scoring**: Confidence scores (0.0-1.0) for position data based on source, age, and quality
 - **Type-safe codebase**: Full type hints throughout
 - Modular architecture for maintainability
 
@@ -83,7 +84,17 @@ python3 src/mqtt-live-publisher.py /dev/ttyUSB0 \
 - `--max-temperature CELSIUS`: Maximum valid temperature in Celsius (default: 85.0)
 - `--validation-failures-topic TOPIC`: MQTT topic for validation failures (default: {mqtt_topic}/validation_failures)
 
-These options control data staleness filtering, error recovery behavior, and health monitoring. GPS data older than the specified age will be automatically filtered out to prevent using outdated location information.
+**Position Confidence Scoring:**
+- `--enable-confidence-scoring`: Enable position confidence scoring
+- `--anchor-confidence FLOAT`: Confidence score for anchor points (default: 1.0)
+- `--lora-gps-base-confidence FLOAT`: Base confidence for LoRa GPS data (default: 0.7)
+- `--lora-gps-min-confidence FLOAT`: Minimum confidence for LoRa GPS data (default: 0.3)
+- `--lora-gps-decay-rate FLOAT`: Confidence decay rate per TTL period (default: 0.1)
+- `--gps-accuracy-weight FLOAT`: Weight for GPS accuracy in confidence (default: 0.2)
+- `--gateway-count-weight FLOAT`: Weight for gateway count in confidence (default: 0.1)
+- `--rssi-weight FLOAT`: Weight for RSSI/SNR in confidence (default: 0.1)
+
+These options control data staleness filtering, error recovery behavior, health monitoring, data validation, and position confidence scoring. GPS data older than the specified age will be automatically filtered out to prevent using outdated location information.
 
 ## Development
 

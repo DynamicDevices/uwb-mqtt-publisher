@@ -5,6 +5,40 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.0] - 2025-01-XX
+
+### Added
+- **Position Confidence Scoring**: Complete Priority 2 confidence scoring system
+  - Calculate confidence scores (0.0-1.0) for position data based on source, age, and quality metrics
+  - Anchor points have maximum confidence (1.0, configurable)
+  - LoRa GPS data has configurable base confidence (default: 0.7) and minimum confidence (default: 0.3)
+  - Confidence decay over time for LoRa data based on TTL
+  - GPS accuracy adjustment (better accuracy = higher confidence)
+  - Gateway count adjustment (more gateways = higher confidence)
+  - RSSI/SNR adjustment (better signal = higher confidence)
+  - `positionConfidence` field added to CGA format
+  - `--enable-confidence-scoring` flag to enable confidence scoring
+  - `--anchor-confidence`, `--lora-gps-base-confidence`, `--lora-gps-min-confidence` parameters
+  - `--lora-gps-decay-rate` parameter for time-based decay
+  - `--gps-accuracy-weight`, `--gateway-count-weight`, `--rssi-weight` parameters for quality adjustments
+  - Integration with network converter for automatic confidence calculation
+
+- **New Module**:
+  - `src/uwb_confidence_scorer.py`: Position confidence scoring with configurable algorithms
+
+### Changed
+- CGA format now includes `positionConfidence` field when confidence scoring is enabled
+- Confidence scores help downstream systems make intelligent decisions about data quality
+
+### Technical Details
+- Anchor confidence: Always 1.0 (configurable)
+- LoRa GPS confidence: Base 0.7, minimum 0.3, decays over time
+- Confidence factors: data age (decay), GPS accuracy, gateway count, RSSI/SNR
+- Confidence calculation: `base_confidence - time_decay + accuracy_bonus + gateway_bonus + rssi_bonus`
+- Confidence clamped to valid range: `[min_confidence, base_confidence]`
+
+---
+
 ## [1.3.0] - 2025-01-XX
 
 ### Added

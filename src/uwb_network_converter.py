@@ -34,7 +34,8 @@ class UwbNetworkConverter:
         anchor_config_path: Optional[str] = None,
         dev_eui_mapping_path: Optional[str] = None,
         lora_cache: Optional[Any] = None,
-        data_validator: Optional[Any] = None
+        data_validator: Optional[Any] = None,
+        confidence_scorer: Optional[Any] = None
     ) -> None:
         """
         Initialize the converter with anchor point configuration.
@@ -55,6 +56,7 @@ class UwbNetworkConverter:
         self.dev_eui_mapping_path = dev_eui_mapping_path
         self.lora_cache = lora_cache
         self.data_validator = data_validator
+        self.confidence_scorer = confidence_scorer
         self.anchor_map: Dict[str, List[float]] = {}  # Maps anchor ID to [lat, lon, alt]
         self.dev_eui_to_uwb_id_map: Dict[str, str] = {}  # Maps dev_eui (hex string) to UWB ID (hex string)
 
@@ -221,6 +223,17 @@ class UwbNetworkConverter:
                         # Silently fail if cache lookup fails
                         pass
 
+            # Calculate position confidence if scorer is available
+            position_confidence = None
+            if self.confidence_scorer:
+                gps_ttl = getattr(self.lora_cache, 'gps_ttl_seconds', 300.0) if self.lora_cache else 300.0
+                position_confidence = self.confidence_scorer.calculate_confidence(
+                    is_anchor=is_anchor,
+                    lora_data=lora_data,
+                    gps_ttl_seconds=gps_ttl,
+                    current_time=timestamp
+                )
+
             uwb = {
                 "id": uwb_id,
                 "triageStatus": 0,  # unknown/not triaged
@@ -231,6 +244,10 @@ class UwbNetworkConverter:
                 "edges": [],
                 "positionAccuracy": 0.0
             }
+
+            # Add position confidence if calculated
+            if position_confidence is not None:
+                uwb["positionConfidence"] = position_confidence
 
             # Set position source for anchors
             if is_anchor:
