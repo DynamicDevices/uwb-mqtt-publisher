@@ -2,6 +2,13 @@
 
 This guide explains how to test the UWB MQTT Publisher locally without requiring physical hardware.
 
+## Recent Fixes and Improvements
+
+- **Logger Fix**: Fixed `TypeError: 'bool' object is not callable` - use `self._verbose` instead of `self.verbose` attribute
+- **MQTT TLS Fix**: Only use TLS for ports 8883/8884; plain MQTT for port 1883
+- **Parsing Error Handling**: Added validation to handle distance packets arriving before assignment packets
+- **Verbose Logging**: Reduced noise - only logs important information, not every packet detail
+
 ## Prerequisites
 
 Install required Python packages:
