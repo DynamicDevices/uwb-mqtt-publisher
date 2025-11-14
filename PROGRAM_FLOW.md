@@ -188,23 +188,39 @@ graph TD
     Parse --> CheckValid{Valid Packet?}
     
     CheckValid -->|Yes| Process[Process Data]
-    CheckValid -->|No| IncrementError[Increment Error Count]
+    CheckValid -->|No| RecordError[Record Error<br/>Error Recovery System]
     
-    IncrementError --> CheckMax{Error Count<br/>>= MAX?}
-    CheckMax -->|No| LogWarning[Log Warning<br/>Continue Processing]
-    CheckMax -->|Yes| LogCritical[Log Critical Error]
+    RecordError --> CheckErrorType{Error Type?}
+    CheckErrorType -->|Parsing| CheckParsingThreshold{Parsing Errors<br/>>= Threshold?}
+    CheckErrorType -->|Connection| CheckConnThreshold{Connection Errors<br/>>= Threshold?}
     
-    LogCritical --> ResetSerial[Reset Serial Port]
-    ResetSerial --> Reopen[Reopen Serial Port]
-    Reopen --> ClearErrors[Clear Error Count]
+    CheckParsingThreshold -->|No| LogWarning[Log Warning<br/>Update Health Monitor]
+    CheckParsingThreshold -->|Yes| CheckBackoff{Should Reset<br/>with Backoff?}
+    CheckConnThreshold -->|No| LogWarning
+    CheckConnThreshold -->|Yes| CheckBackoff
+    
+    CheckBackoff -->|Yes| CalculateBackoff[Calculate Exponential Backoff<br/>initial * multiplier^reset_count]
+    CalculateBackoff --> WaitBackoff[Wait for Backoff Period]
+    WaitBackoff --> ResetSerial[Reset Device]
+    CheckBackoff -->|No| LogWarning
+    
+    ResetSerial --> RecordReset[Record Device Reset<br/>Update Health Monitor]
+    RecordReset --> ClearErrors[Clear Error Count<br/>for Error Type]
     ClearErrors --> Start
     
     LogWarning --> Start
-    Process --> Publish[Publish to MQTT]
+    Process --> ValidateData{Data Validation<br/>Enabled?}
+    ValidateData -->|Yes| CheckValidation{Data Valid?}
+    ValidateData -->|No| Publish[Publish to MQTT]
+    CheckValidation -->|No| LogValidationFailure[Log Validation Failure<br/>Publish to validation_failures topic]
+    CheckValidation -->|Yes| Publish
+    LogValidationFailure --> Start
+    
     Publish --> CheckMQTT{MQTT<br/>Connected?}
-    CheckMQTT -->|No| LogMQTTError[Log MQTT Error]
-    CheckMQTT -->|Yes| Success[Success]
-    LogMQTTError --> Start
+    CheckMQTT -->|No| RecordMQTTError[Record MQTT Error<br/>Update Health Monitor]
+    CheckMQTT -->|Yes| RecordMQTTSuccess[Record MQTT Success<br/>Update Health Monitor]
+    RecordMQTTError --> Start
+    RecordMQTTSuccess --> Success[Success]
     Success --> Start
 ```
 
@@ -278,13 +294,16 @@ graph LR
     CheckFormat -->|CGA| CGAConversion["CGA Conversion"]
     
     CGAConversion --> AddAnchors["Add Anchor Coordinates<br/>from config<br/>Set positionSource=anchor_config"]
-    AddAnchors --> QueryLoRa["Query LoRa Cache<br/>for each UWB ID"]
+    AddAnchors --> QueryLoRa["Query LoRa Cache<br/>for each UWB ID<br/>(with staleness check)"]
     QueryLoRa --> CheckCoords{UWB has<br/>coordinates?}
-    CheckCoords -->|No| AddLoRaGPS["Add LoRa GPS Coordinates<br/>Update lastPositionUpdateTime"]
+    CheckCoords -->|No| ValidateLoRaGPS["Validate LoRa GPS<br/>if validator enabled<br/>(reject 0,0, check ranges)"]
     CheckCoords -->|Yes| KeepAnchorCoords["Keep Anchor Coordinates<br/>Don't override"]
-    AddLoRaGPS --> AddLoRaMetadata["Add LoRa Metadata:<br/>timestamps, battery, triage,<br/>RSSI, SNR, gateway count, etc."]
-    KeepAnchorCoords --> AddLoRaMetadata
-    AddLoRaMetadata --> SetPositionSource["Set positionSource<br/>and positionAccuracy"]
+    ValidateLoRaGPS --> ValidateLoRaData["Validate LoRa Data<br/>battery, temperature<br/>if validator enabled"]
+    ValidateLoRaData --> AddLoRaGPS["Add LoRa GPS Coordinates<br/>Update lastPositionUpdateTime"]
+    AddLoRaGPS --> CalculateConfidence["Calculate Position Confidence<br/>if scorer enabled<br/>(anchor: 1.0, LoRa: 0.3-0.7)"]
+    KeepAnchorCoords --> CalculateConfidence
+    CalculateConfidence --> AddLoRaMetadata["Add LoRa Metadata:<br/>timestamps, battery, triage,<br/>RSSI, SNR, gateway count, etc."]
+    AddLoRaMetadata --> SetPositionSource["Set positionSource<br/>positionAccuracy<br/>and positionConfidence"]
     SetPositionSource --> CGANetwork["CGA Network Format<br/>Structured JSON<br/>with all metadata"]
     
     SimpleJSON --> MQTT["MQTT Publish"]
