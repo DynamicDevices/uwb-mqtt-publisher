@@ -9,8 +9,12 @@ graph TB
     Start([Program Start]) --> ParseArgs[Parse Command Line Arguments]
     ParseArgs --> LoadModules[Load Optional Modules]
     ParseArgs --> LoadDevEUIMap[Load Dev EUI Mapping<br/>if --dev-eui-mapping]
-    LoadDevEUIMap --> InitLoRa[Initialize LoRa Cache<br/>if --enable-lora-cache]
-    InitLoRa --> InitUWB[Initialize UWB Network Converter<br/>if --cga-format<br/>Pass LoRa cache]
+    LoadDevEUIMap --> InitLoRa[Initialize LoRa Cache<br/>if --enable-lora-cache<br/>with TTL and cleanup]
+    InitLoRa --> InitErrorRecovery[Initialize Error Recovery<br/>with exponential backoff]
+    InitErrorRecovery --> InitHealthMonitor[Initialize Health Monitor<br/>with MQTT reporting]
+    InitHealthMonitor --> InitValidator[Initialize Data Validator<br/>if --enable-validation]
+    InitValidator --> InitConfidenceScorer[Initialize Confidence Scorer<br/>if --enable-confidence-scoring]
+    InitConfidenceScorer --> InitUWB[Initialize UWB Network Converter<br/>if --cga-format<br/>Pass LoRa cache, validator, scorer]
     InitUWB --> SetupMQTT[Setup MQTT Client<br/>if not --disable-mqtt]
     SetupMQTT --> OpenSerial[Open Serial Port<br/>/dev/ttyUSB0]
     OpenSerial --> MainLoop[Main Processing Loop]
@@ -18,23 +22,31 @@ graph TB
     MainLoop --> ReadSerial[Read Data from Serial Port]
     ReadSerial --> ParsePacket[Parse UWB Packet]
     ParsePacket --> ValidateData{Valid Packet?}
-    ValidateData -->|No| HandleError[Handle Parsing Error]
-    HandleError --> CheckMaxErrors{Max Errors<br/>Reached?}
-    CheckMaxErrors -->|Yes| ResetDevice[Reset Device]
-    CheckMaxErrors -->|No| MainLoop
-    ResetDevice --> MainLoop
+    ValidateData -->|No| HandleError[Handle Parsing Error<br/>with Error Recovery]
+    HandleError --> CheckMaxErrors{Max Errors<br/>with Backoff?}
+    CheckMaxErrors -->|Yes| ResetDevice[Reset Device<br/>with Exponential Backoff]
+    CheckMaxErrors -->|No| RecordError[Record Error<br/>Update Health Monitor]
+    RecordError --> MainLoop
+    ResetDevice --> RecordReset[Record Device Reset<br/>Update Health Monitor]
+    RecordReset --> MainLoop
     
     ValidateData -->|Yes| ExtractEdges[Extract Edge List<br/>Node pairs + distances]
-    ExtractEdges --> FormatData[Format Data]
+    ExtractEdges --> ValidateDistances{Data Validation<br/>Enabled?}
+    ValidateDistances -->|Yes| CheckDistances[Validate Distances<br/>Filter Invalid Data]
+    ValidateDistances -->|No| FormatData[Format Data]
+    CheckDistances --> FormatData
     FormatData --> CheckCGA{CGA Format<br/>Enabled?}
     
-    CheckCGA -->|Yes| ConvertCGA[Convert to CGA Network Format<br/>Add anchor coordinates<br/>Query LoRa cache for GPS/metadata<br/>Add timestamps, battery, triage, etc.]
+    CheckCGA -->|Yes| ConvertCGA[Convert to CGA Network Format<br/>Add anchor coordinates<br/>Query LoRa cache for GPS/metadata<br/>Validate GPS/battery/temp<br/>Calculate position confidence<br/>Add timestamps, battery, triage, etc.]
     CheckCGA -->|No| SimpleFormat[Simple Edge List Format]
     
     ConvertCGA --> RateLimit[Check Rate Limit]
     SimpleFormat --> RateLimit
-    RateLimit --> PublishMQTT[Publish to MQTT Broker]
-    PublishMQTT --> MainLoop
+    RateLimit --> PublishMQTT[Publish to MQTT Broker<br/>Record Success/Failure]
+    PublishMQTT --> ReportHealth{Health Report<br/>Due?}
+    ReportHealth -->|Yes| PublishHealth[Publish Health Report<br/>to MQTT]
+    ReportHealth -->|No| MainLoop
+    PublishHealth --> MainLoop
     
     SetupMQTT -.->|Background Thread| MQTTLoop[MQTT Event Loop<br/>Handle commands]
     InitLoRa -.->|Background Thread| LoRaLoop[LoRa MQTT Subscription<br/>Cache tag data]
@@ -150,13 +162,20 @@ graph LR
     Serial -->|Raw Packets| Main
     Main -->|Parse| Parser
     Parser -->|Edge List| Main
+    Main -->|Validate| Validator
+    Validator -->|Valid Data| Main
     Main -->|Convert| Converter
     Converter -->|Read| AnchorConfig
     Converter -->|Query| Cache
+    Converter -->|Validate| Validator
+    Converter -->|Calculate Confidence| ConfidenceScorer
     Converter -->|Read| DevEUIMap
     LoRaMQTT -->|Subscribe| Cache
     Cache -->|Read| DevEUIMap
+    Main -->|Record Errors| ErrorRecovery
+    Main -->|Record Metrics| HealthMonitor
     Main -->|Publish| MQTTBroker
+    HealthMonitor -->|Publish Health| MQTTBroker
     MQTTBroker -->|Commands| Main
     Main -->|Update Rate Limit| Main
 ```
