@@ -16,7 +16,7 @@ from typing import Dict, Optional, Any
 
 try:
     import paho.mqtt.client as mqtt
-except ImportError as e:
+except ImportError:
     print("Error: paho-mqtt library not found. Install with: pip install paho-mqtt")
     raise
 
@@ -34,7 +34,10 @@ class LoraTagDataCache:
                  password: str = None,
                  topic_pattern: str = "#",
                  dev_eui_to_uwb_id_map: Dict[str, str] = None,
-                 verbose: bool = False):
+                 verbose: bool = False,
+                 gps_ttl_seconds: float = 300.0,  # 5 minutes default for GPS
+                 sensor_ttl_seconds: float = 600.0,  # 10 minutes default for sensor data
+                 cleanup_interval_seconds: float = 60.0):  # Cleanup every minute
         """
         Initialize the LoRa tag data cache.
         
@@ -46,6 +49,9 @@ class LoraTagDataCache:
             topic_pattern: MQTT topic pattern to subscribe to (default: "#" for all topics)
             dev_eui_to_uwb_id_map: Dictionary mapping dev_eui (hex string) to UWB ID (hex string)
             verbose: Enable verbose logging
+            gps_ttl_seconds: Time-to-live for GPS data in seconds (default: 300 = 5 minutes)
+            sensor_ttl_seconds: Time-to-live for sensor data in seconds (default: 600 = 10 minutes)
+            cleanup_interval_seconds: Interval for cache cleanup thread in seconds (default: 60)
         """
         self.broker = broker
         self.port = port
@@ -54,6 +60,9 @@ class LoraTagDataCache:
         self.topic_pattern = topic_pattern
         self.dev_eui_to_uwb_id_map = dev_eui_to_uwb_id_map or {}
         self.verbose = verbose
+        self.gps_ttl_seconds = gps_ttl_seconds
+        self.sensor_ttl_seconds = sensor_ttl_seconds
+        self.cleanup_interval_seconds = cleanup_interval_seconds
         
         # Cache: dev_eui -> latest data
         self._cache: Dict[str, Dict[str, Any]] = {}
@@ -63,9 +72,13 @@ class LoraTagDataCache:
         self._uwb_cache: Dict[str, Dict[str, Any]] = {}
         
         # MQTT client
-        self.mqtt_client = None
-        self._running = False
-        self._thread = None
+        self.mqtt_client: Optional[mqtt.Client] = None
+        self._running: bool = False
+        self._thread: Optional[threading.Thread] = None
+        
+        # Cleanup thread for expired entries
+        self._cleanup_thread: Optional[threading.Thread] = None
+        self._cleanup_running: bool = False
         
     def _log(self, message: str, level: str = "INFO"):
         """Internal logging method"""
@@ -73,7 +86,13 @@ class LoraTagDataCache:
             timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             print(f"[{timestamp}] [LoRaCache {level}] {message}")
     
-    def _on_connect(self, client, userdata, flags, rc):
+    def _on_connect(
+        self, 
+        client: mqtt.Client, 
+        userdata: Any, 
+        flags: Dict[str, int], 
+        rc: int
+    ) -> None:
         """MQTT connection callback"""
         if rc == 0:
             self._log(f"Connected to TTN MQTT broker {self.broker}:{self.port}")
@@ -85,14 +104,24 @@ class LoraTagDataCache:
         else:
             self._log(f"Failed to connect to MQTT broker (rc={rc})", "ERROR")
     
-    def _on_disconnect(self, client, userdata, rc):
+    def _on_disconnect(
+        self, 
+        client: mqtt.Client, 
+        userdata: Any, 
+        rc: int
+    ) -> None:
         """MQTT disconnection callback"""
         if rc != 0:
             self._log(f"Unexpected disconnection from MQTT broker (rc={rc})", "WARNING")
         else:
             self._log("Disconnected from MQTT broker")
     
-    def _on_message(self, client, userdata, message):
+    def _on_message(
+        self, 
+        client: mqtt.Client, 
+        userdata: Any, 
+        message: mqtt.MQTTMessage
+    ) -> None:
         """MQTT message callback - processes LoRa tag data"""
         try:
             topic = message.topic
@@ -197,8 +226,8 @@ class LoraTagDataCache:
                 import traceback
                 traceback.print_exc()
     
-    def start(self):
-        """Start the MQTT subscriber in a background thread"""
+    def start(self) -> None:
+        """Start the MQTT subscriber and cleanup thread in background threads"""
         if self._running:
             self._log("Cache already running", "WARNING")
             return
@@ -206,19 +235,29 @@ class LoraTagDataCache:
         self._running = True
         self._thread = threading.Thread(target=self._run, daemon=True)
         self._thread.start()
-        self._log("LoRa tag cache started")
+        
+        # Start cleanup thread
+        self._cleanup_running = True
+        self._cleanup_thread = threading.Thread(target=self._cleanup_loop, daemon=True)
+        self._cleanup_thread.start()
+        
+        self._log(f"LoRa tag cache started (GPS TTL: {self.gps_ttl_seconds}s, Sensor TTL: {self.sensor_ttl_seconds}s)")
     
-    def stop(self):
-        """Stop the MQTT subscriber"""
+    def stop(self) -> None:
+        """Stop the MQTT subscriber and cleanup thread"""
         self._running = False
+        self._cleanup_running = False
+        
         if self.mqtt_client:
             self.mqtt_client.loop_stop()
             self.mqtt_client.disconnect()
         if self._thread:
             self._thread.join(timeout=5)
+        if self._cleanup_thread:
+            self._cleanup_thread.join(timeout=5)
         self._log("LoRa tag cache stopped")
     
-    def _run(self):
+    def _run(self) -> None:
         """Run the MQTT client loop"""
         try:
             self.mqtt_client = mqtt.Client()
@@ -270,19 +309,110 @@ class LoraTagDataCache:
         with self._cache_lock:
             return self._cache.get(dev_eui)
     
-    def get_by_uwb_id(self, uwb_id: str) -> Optional[Dict[str, Any]]:
+    def get_by_uwb_id(
+        self, 
+        uwb_id: str, 
+        max_age_seconds: Optional[float] = None,
+        check_gps_staleness: bool = True
+    ) -> Optional[Dict[str, Any]]:
         """
         Get cached data by UWB ID (using dev_eui mapping).
         
         Args:
             uwb_id: UWB ID (hex string, case-insensitive)
+            max_age_seconds: Maximum age in seconds for data to be considered valid.
+                           If None, uses configured TTL values.
+            check_gps_staleness: If True, checks GPS data staleness separately using GPS TTL
             
         Returns:
-            Cached data dictionary or None if not found
+            Cached data dictionary or None if not found or stale
         """
         uwb_id = uwb_id.upper()
         with self._cache_lock:
-            return self._uwb_cache.get(uwb_id)
+            data = self._uwb_cache.get(uwb_id)
+            if data is None:
+                return None
+            
+            # Check if data is stale
+            if not self._is_data_valid(data, max_age_seconds, check_gps_staleness):
+                return None
+            
+            return data
+    
+    def _is_data_valid(
+        self, 
+        data: Dict[str, Any], 
+        max_age_seconds: Optional[float] = None,
+        check_gps_staleness: bool = True
+    ) -> bool:
+        """
+        Check if cached data is still valid (not expired).
+        
+        Args:
+            data: Cached data dictionary
+            max_age_seconds: Override max age (uses configured TTL if None)
+            check_gps_staleness: If True, checks GPS data separately
+            
+        Returns:
+            True if data is valid, False if expired
+        """
+        if not data or "timestamp" not in data:
+            return False
+        
+        current_time = time.time()
+        data_age = current_time - data.get("timestamp", 0)
+        
+        # Check GPS staleness if location data exists
+        if check_gps_staleness and data.get("location"):
+            location = data["location"]
+            if location.get("latitude") and location.get("longitude"):
+                # GPS data has stricter TTL
+                gps_max_age = max_age_seconds if max_age_seconds is not None else self.gps_ttl_seconds
+                if data_age > gps_max_age:
+                    return False
+        
+        # Check general data staleness
+        sensor_max_age = max_age_seconds if max_age_seconds is not None else self.sensor_ttl_seconds
+        return data_age <= sensor_max_age
+    
+    def _cleanup_loop(self) -> None:
+        """Background thread to periodically clean up expired entries."""
+        while self._cleanup_running:
+            try:
+                time.sleep(self.cleanup_interval_seconds)
+                self._cleanup_expired_entries()
+            except Exception as e:
+                self._log(f"Error in cleanup loop: {e}", "ERROR")
+    
+    def _cleanup_expired_entries(self) -> None:
+        """Remove expired entries from cache."""
+        expired_dev_euis = []
+        expired_uwb_ids = []
+        
+        with self._cache_lock:
+            # Check dev_eui cache
+            for dev_eui, data in list(self._cache.items()):
+                if not self._is_data_valid(data, check_gps_staleness=True):
+                    expired_dev_euis.append(dev_eui)
+            
+            # Check UWB cache
+            for uwb_id, data in list(self._uwb_cache.items()):
+                if not self._is_data_valid(data, check_gps_staleness=True):
+                    expired_uwb_ids.append(uwb_id)
+            
+            # Remove expired entries
+            for dev_eui in expired_dev_euis:
+                del self._cache[dev_eui]
+            
+            for uwb_id in expired_uwb_ids:
+                del self._uwb_cache[uwb_id]
+            
+            if expired_dev_euis or expired_uwb_ids:
+                self._log(
+                    f"Cleaned up {len(expired_dev_euis)} dev_eui entries and "
+                    f"{len(expired_uwb_ids)} UWB ID entries",
+                    "VERBOSE"
+                )
     
     def get_all_cached(self) -> Dict[str, Dict[str, Any]]:
         """

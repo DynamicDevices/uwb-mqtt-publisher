@@ -9,6 +9,12 @@ This application reads UWB positioning data from a serial port and publishes it 
 - Integrates LoRa tag data (GPS, battery, triage status) from TTN
 - Configurable anchor points and dev_eui mappings
 - Rate limiting for MQTT publishing
+- **Data quality management**: Automatic staleness filtering for LoRa data
+- **Cache expiration**: Automatic cleanup of expired cache entries
+- **Enhanced error recovery**: Exponential backoff, different error thresholds, health monitoring
+- **Health monitoring**: MQTT-based health reporting with connection metrics
+- **Graceful degradation**: Continue with partial data when possible
+- **Type-safe codebase**: Full type hints throughout
 - Modular architecture for maintainability
 
 ## Installation
@@ -42,8 +48,30 @@ python3 src/mqtt-live-publisher.py /dev/ttyUSB0 \
     --lora-port 8883 \
     --lora-username inst-external-tags@ttn \
     --lora-password <password> \
-    --lora-topic "#"
+    --lora-topic "#" \
+    --lora-gps-max-age 300 \
+    --lora-sensor-max-age 600
 ```
+
+### New Options
+
+**Data Quality:**
+- `--lora-gps-max-age SECONDS`: Maximum age for LoRa GPS data in seconds (default: 300 = 5 minutes)
+- `--lora-sensor-max-age SECONDS`: Maximum age for LoRa sensor data in seconds (default: 600 = 10 minutes)
+
+**Error Recovery:**
+- `--parsing-error-threshold COUNT`: Max parsing errors before reset (default: 3)
+- `--connection-error-threshold COUNT`: Max connection errors before reset (default: 3)
+- `--backoff-initial SECONDS`: Initial backoff delay for resets (default: 1.0)
+- `--backoff-max SECONDS`: Maximum backoff delay (default: 60.0)
+- `--backoff-multiplier FLOAT`: Exponential backoff multiplier (default: 2.0)
+
+**Health Monitoring:**
+- `--health-topic TOPIC`: MQTT topic for health reports (default: {mqtt_topic}/health)
+- `--health-interval SECONDS`: Health report interval in seconds (default: 60)
+- `--graceful-degradation`: Continue with partial data when possible
+
+These options control data staleness filtering, error recovery behavior, and health monitoring. GPS data older than the specified age will be automatically filtered out to prevent using outdated location information.
 
 ## Development
 
@@ -90,7 +118,9 @@ uwb-mqtt-publisher/
 │   ├── uwb_mqtt_client.py         # MQTT client
 │   ├── uwb_logging.py             # Logging utilities
 │   ├── uwb_network_converter.py   # CGA format conversion
-│   └── lora_tag_cache.py          # LoRa data caching
+│   ├── lora_tag_cache.py          # LoRa data caching with expiration
+│   ├── uwb_constants.py           # Centralized constants
+│   └── uwb_exceptions.py          # Custom exception classes
 ├── config/
 │   ├── uwb_anchors.json           # Anchor configuration
 │   ├── uwb_anchors_hw_lab.json   # Hardware lab anchors

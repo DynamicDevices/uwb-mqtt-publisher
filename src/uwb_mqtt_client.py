@@ -8,6 +8,7 @@ import json
 import ssl
 import time
 import threading
+from typing import Optional, Any, Dict, Union, List
 
 try:
     import paho.mqtt.client as mqtt
@@ -19,8 +20,17 @@ except ImportError:
 class UwbMqttClient:
     """MQTT client for publishing UWB data and receiving commands."""
 
-    def __init__(self, broker, port, topic, rate_limit=10.0, command_topic=None,
-                 verbose=False, quiet=False, disable_mqtt=False):
+    def __init__(
+        self, 
+        broker: str, 
+        port: int, 
+        topic: str, 
+        rate_limit: float = 10.0, 
+        command_topic: Optional[str] = None,
+        verbose: bool = False, 
+        quiet: bool = False, 
+        disable_mqtt: bool = False
+    ) -> None:
         """
         Initialize MQTT client.
 
@@ -42,19 +52,25 @@ class UwbMqttClient:
         self.quiet = quiet
         self.disable_mqtt = disable_mqtt
 
-        self.client = None
-        self.last_publish_time = 0
-        self.rate_limit = rate_limit
+        self.client: Optional[mqtt.Client] = None
+        self.last_publish_time: float = 0.0
+        self.rate_limit: float = rate_limit
         self.rate_limit_lock = threading.Lock()
 
-    def _log(self, message, level="INFO"):
+    def _log(self, message: str, level: str = "INFO") -> None:
         """Internal logging."""
         if not self.quiet:
             if level == "VERBOSE" and not self.verbose:
                 return
             print(f"[{level}] {message}")
 
-    def _on_connect(self, client, userdata, flags, rc):
+    def _on_connect(
+        self, 
+        client: mqtt.Client, 
+        userdata: Any, 
+        flags: Dict[str, int], 
+        rc: int
+    ) -> None:
         """MQTT connection callback."""
         if rc == 0:
             self._log(f"Connected to MQTT broker {self.broker}:{self.port}", "INFO")
@@ -66,23 +82,44 @@ class UwbMqttClient:
         else:
             self._log(f"Failed to connect to MQTT broker (rc={rc})", "ERROR")
 
-    def _on_disconnect(self, client, userdata, rc):
+    def _on_disconnect(
+        self, 
+        client: mqtt.Client, 
+        userdata: Any, 
+        rc: int
+    ) -> None:
         """MQTT disconnection callback."""
         if rc != 0:
             self._log(f"Unexpected disconnection from MQTT broker (rc={rc})", "WARNING")
         else:
             self._log("Disconnected from MQTT broker", "VERBOSE")
 
-    def _on_publish(self, client, userdata, mid):
+    def _on_publish(
+        self, 
+        client: mqtt.Client, 
+        userdata: Any, 
+        mid: int
+    ) -> None:
         """MQTT publish callback."""
         self._log(f"Message {mid} published successfully", "VERBOSE")
 
-    def _on_log(self, client, userdata, level, buf):
+    def _on_log(
+        self, 
+        client: mqtt.Client, 
+        userdata: Any, 
+        level: int, 
+        buf: str
+    ) -> None:
         """MQTT log callback."""
         if self.verbose:
             print(f"[MQTT LOG] {buf}")
 
-    def _on_message(self, client, userdata, message):
+    def _on_message(
+        self, 
+        client: mqtt.Client, 
+        userdata: Any, 
+        message: mqtt.MQTTMessage
+    ) -> None:
         """Handle incoming MQTT command messages."""
         try:
             topic = message.topic
@@ -109,7 +146,7 @@ class UwbMqttClient:
         except Exception as e:
             self._log(f"Error processing MQTT command: {e}", "ERROR")
 
-    def setup(self):
+    def setup(self) -> Optional[mqtt.Client]:
         """Setup and connect MQTT client."""
         if self.disable_mqtt:
             self._log("MQTT disabled", "VERBOSE")
@@ -166,7 +203,7 @@ class UwbMqttClient:
                 traceback.print_exc()
             return None
 
-    def publish(self, data):
+    def publish(self, data: Union[Dict[str, Any], List[Any]]) -> None:
         """
         Publish data to MQTT broker with rate limiting.
 
@@ -221,7 +258,7 @@ class UwbMqttClient:
                 import traceback
                 traceback.print_exc()
 
-    def disconnect(self):
+    def disconnect(self) -> None:
         """Disconnect from MQTT broker."""
         if self.client:
             self._log("Stopping MQTT client loop", "VERBOSE")
