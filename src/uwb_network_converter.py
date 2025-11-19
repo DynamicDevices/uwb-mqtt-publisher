@@ -341,16 +341,13 @@ class UwbNetworkConverter:
             end1_id = edge[1]
             distance = float(edge[2])
 
-            edge_obj = {
-                "end0": end0_id,
-                "end1": end1_id,
-                "distance": distance
-            }
-
-            # Add edge to both UWBs (bidirectional)
+            # Add edge to both UWBs - making sure end0 = this node and end1 = the other node
             if end0_id in uwb_map:
+                edge_obj = { "end0": end0_id, "end1": end1_id, "distance": float(distance)}                
                 uwb_map[end0_id]["edges"].append(edge_obj)
+                
             if end1_id in uwb_map:
+                edge_obj = { "end0": end1_id, "end1": end0_id, "distance": float(distance)}            
                 uwb_map[end1_id]["edges"].append(edge_obj)
 
         # Create Network object
