@@ -23,7 +23,7 @@ MQTT_RATE_LIMIT="10.0"
 #   --cga-format       : Publish in CGA network format
 #   --anchor-config    : Path to anchor configuration JSON file
 #   --dev-eui-mapping  : Path to dev_eui to UWB ID mapping JSON file
-EXTRA_ARGS="--cga-format --anchor-config /etc/uwb_anchors_hw_lab.json --dev-eui-mapping /etc/dev_eui_to_uwb_mappings.json"
+EXTRA_ARGS="--verbose --cga-format --anchor-config /etc/uwb_anchors_hw_lab.json --dev-eui-mapping /etc/dev_eui_to_uwb_mappings.json"
 
 # Examples:
 # EXTRA_ARGS="--verbose"

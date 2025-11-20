@@ -509,16 +509,27 @@ def main() -> None:
                                         logger.warning(f"Distance packet received but no valid assignments (assignments={assignments}), skipping")
                                         continue
 
-                                    # Verify assignments structure
-                                    if not all(isinstance(g, list) and len(g) > 0 for g in assignments):
+                                    # Verify assignments structure - all must be lists, but empty groups are valid
+                                    if not all(isinstance(g, list) for g in assignments):
                                         logger.warning(f"Invalid assignments structure: {assignments}, skipping distance packet")
                                         continue
 
-                                    tof_count = g1 * g2 + g1 * g3 + g2 * g3
+                                    # Use actual group lengths instead of stale g1, g2, g3 variables
+                                    actual_g1 = len(assignments[0])
+                                    actual_g2 = len(assignments[1])
+                                    actual_g3 = len(assignments[2])
+
+                                    # Check that we have at least two non-empty groups for distance calculations
+                                    non_empty_groups = sum(1 for g in assignments if len(g) > 0)
+                                    if non_empty_groups < 2:
+                                        logger.warning(f"Insufficient groups with nodes for distance calculation (assignments={assignments}), skipping distance packet")
+                                        continue
+
+                                    tof_count = actual_g1 * actual_g2 + actual_g1 * actual_g3 + actual_g2 * actual_g3
                                     if mode & MODE_GROUP1_INTERNAL:
-                                        tof_count = tof_count + g1 * (g1 - 1) / 2
+                                        tof_count = tof_count + actual_g1 * (actual_g1 - 1) / 2
                                     if mode & MODE_GROUP2_INTERNAL:
-                                        tof_count = tof_count + g2 * (g2 - 1) / 2
+                                        tof_count = tof_count + actual_g2 * (actual_g2 - 1) / 2
 
                                     tof_count = int(tof_count)
                                     # Don't log tof_count every time (too verbose)
