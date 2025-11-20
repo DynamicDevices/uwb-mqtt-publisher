@@ -59,18 +59,16 @@ def parse_final_payload(
             error_handler(error_msg)
         return results
 
-    # Check if any assignment group is empty or invalid
+    # Check if assignment groups are valid lists (empty groups are allowed)
+    # Empty groups will be skipped during processing, which is safe
     for i, group in enumerate(assignments):
         if not isinstance(group, list):
             error_msg = f"Assignment group {i} is not a list: {type(group)}"
             if error_handler:
                 error_handler(error_msg)
             return results
-        if len(group) == 0:
-            error_msg = f"Assignment group {i} is empty"
-            if error_handler:
-                error_handler(error_msg)
-            return results
+        # Note: Empty groups are allowed - they will be skipped during processing
+        # The caller (mqtt-live-publisher.py) validates that at least 2 groups are non-empty
 
     try:
         idx = 0
