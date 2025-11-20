@@ -7,7 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [1.4.2] - 2025-01-14
+## [1.4.2] - 2025-11-20
+
+### Fixed
+- **Logger TypeError**: Fixed `TypeError: 'bool' object is not callable` by renaming internal `_verbose` attribute to `_verbose_flag`
+- **Empty Groups Validation**: Allow empty groups in assignments structure (valid when g2=0 or other groups are empty)
+- **TOF Count Calculation**: Use actual group lengths from assignments instead of stale g1, g2, g3 variables
+
+### Changed
+- **Verbose Logging**: Reduced noise in verbose mode
+  - Removed repetitive assignment packet logging (was logging every packet)
+  - Only log assignment updates when they actually change
+  - Added logging for incoming distance packets (summary)
+  - Added logging for published data (CGA network or edge list summaries)
+  - Reduced MQTT client verbose noise (summaries instead of full JSON payloads)
+- **Default Configuration**: Enabled `--verbose` by default in container config for better debugging
+
+### Added
+- **Data Visibility**: Improved logging to show actual data flow
+  - Incoming distance measurements summary
+  - Published data summaries (UWBs count, edges count)
+  - Assignment updates only when changed
+
+## [1.4.1] - 2025-01-14
 
 ### Added
 - **Enhanced LoRa Cache Logging**: Comprehensive logging for debugging positioning and caching issues
