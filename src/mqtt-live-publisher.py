@@ -209,9 +209,14 @@ class PacketProcessor:
         if self.uwb_converter is not None:
             try:
                 network_data = self.uwb_converter.convert_edges_to_network(formatted_data, timestamp=current_timestamp)
-                # Don't log every conversion (too verbose) - only log on errors
                 if self.mqtt_client:
                     try:
+                        # Log the data being published (summary for verbose mode)
+                        if self.logger._verbose_flag:
+                            import json
+                            uwb_count = len(network_data.get("uwbs", []))
+                            total_edges = sum(len(uwb.get("edges", [])) for uwb in network_data.get("uwbs", []))
+                            self.logger.info(f"Publishing CGA network: {uwb_count} UWBs, {total_edges} edges")
                         self.mqtt_client.publish(network_data)
                         if self.health_monitor:
                             self.health_monitor.record_mqtt_publish(success=True)
@@ -228,6 +233,9 @@ class PacketProcessor:
             # Publish in simple edge list format
             if self.mqtt_client:
                 try:
+                    # Log the data being published (summary for verbose mode)
+                    if self.logger._verbose_flag:
+                        self.logger.info(f"Publishing edge list: {len(formatted_data)} edges")
                     self.mqtt_client.publish(formatted_data)
                     if self.health_monitor:
                         self.health_monitor.record_mqtt_publish(success=True)
@@ -455,9 +463,6 @@ def main() -> None:
                                     raise ValueError("Payload too short")
 
                                 [act_type, act_slot, timeframe] = struct.unpack('<BbH', bytes(payload[idx:(idx + 4)]))
-                                # Only log act_type for assignment packets (type 2) to reduce noise
-                                if payload[0] == PACKET_TYPE_ASSIGNMENT:
-                                    logger.verbose(f"Assignment packet: act_type={hex(act_type)}, slot={act_slot}, timeframe={timeframe}")
                                 idx = idx + 4
 
                                 if payload[0] == PACKET_TYPE_ASSIGNMENT:
@@ -467,8 +472,6 @@ def main() -> None:
                                         raise ValueError("Assignment payload too short")
 
                                     [tx_pwr, mode, g1, g2, g3] = struct.unpack('<BBBBB', bytes(payload[idx:(idx + 5)]))
-                                    # Only log mode details if groups changed significantly
-                                    logger.verbose(f"Assignment: mode={hex(mode)}, groups=[{g1}, {g2}, {g3}]")
                                     idx = idx + 5
 
                                     group1 = []
@@ -497,9 +500,9 @@ def main() -> None:
                                         idx = idx + 2
 
                                     assignments = [group1, group2, group3]
-                                    # Only log assignments if they changed (reduce noise)
+                                    # Only log assignments if they changed (reduce noise from repeated assignment packets)
                                     if not hasattr(processor, '_last_assignments') or processor._last_assignments != assignments:
-                                        logger.verbose(f"New assignments: group1={len(group1)}, group2={len(group2)}, group3={len(group3)}")
+                                        logger.info(f"Assignment updated: mode={hex(mode)}, groups=[{len(group1)}, {len(group2)}, {len(group3)}]")
                                         processor._last_assignments = assignments
 
                                 if payload[0] == PACKET_TYPE_DISTANCE:
@@ -544,13 +547,16 @@ def main() -> None:
                                         assignments[2][g3 - unassigned_count + i] = id
 
                                     # Parse final payload
-                                    # Only log parsing details if verbose and first time or on error
                                     results = parse_final_payload(
                                         assignments,
                                         bytes(payload[idx:]),
                                         mode,
                                         error_handler=processor.handle_parsing_error
                                     )
+
+                                    # Log incoming distance data (summary)
+                                    if len(results) > 0 and logger._verbose_flag:
+                                        logger.info(f"Received distance packet: {len(results)} measurements")
 
                                     # Process and publish results
                                     processor.process_results(results, assignments)

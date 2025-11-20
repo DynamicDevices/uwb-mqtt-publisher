@@ -241,10 +241,17 @@ class UwbMqttClient:
         try:
             # Convert data to JSON string
             json_data = json.dumps(data)
-            self._log(f"Attempting to publish to topic '{self.topic}': {json_data}", "VERBOSE")
+            # Log summary instead of full payload to reduce noise
+            if isinstance(data, dict) and "uwbs" in data:
+                uwb_count = len(data.get("uwbs", []))
+                total_edges = sum(len(uwb.get("edges", [])) for uwb in data.get("uwbs", []))
+                self._log(f"Publishing to '{self.topic}': {uwb_count} UWBs, {total_edges} edges", "VERBOSE")
+            elif isinstance(data, list):
+                self._log(f"Publishing to '{self.topic}': {len(data)} edges", "VERBOSE")
+            else:
+                self._log(f"Publishing to '{self.topic}': {len(json_data)} bytes", "VERBOSE")
 
             result = self.client.publish(self.topic, json_data, qos=1)
-            self._log(f"Publish result: rc={result.rc}, mid={result.mid}", "VERBOSE")
 
             if result.rc == mqtt.MQTT_ERR_SUCCESS:
                 self.last_publish_time = current_time
