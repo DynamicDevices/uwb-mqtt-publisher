@@ -18,7 +18,7 @@ class UwbLogger:
             verbose: Enable verbose logging
             quiet: Enable quiet mode (minimal logging)
         """
-        self._verbose = verbose
+        self._verbose_flag = verbose
         self.quiet = quiet
 
     def info(self, message: str) -> None:
@@ -28,7 +28,7 @@ class UwbLogger:
 
     def verbose(self, message: str) -> None:
         """Log verbose message (only shown if verbose enabled)."""
-        if self._verbose:
+        if self._verbose_flag:
             print(message)
 
     def warning(self, message: str) -> None:
