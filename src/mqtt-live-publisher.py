@@ -65,6 +65,8 @@ def parse_arguments() -> argparse.Namespace:
     parser.add_argument("--disable-mqtt", help="Alias for --disable-publish-mqtt (deprecated, use --disable-publish-mqtt)", action="store_true")
     parser.add_argument("--verbose", help="Enable verbose logging", action="store_true")
     parser.add_argument("--quiet", help="Enable quiet mode (minimal logging)", action="store_true")
+    parser.add_argument("--log-received-data", help="Enable logging of received UWB data from serial port", action="store_true")
+    parser.add_argument("--log-published-data", help="Enable logging of published UWB data to MQTT broker", action="store_true")
     parser.add_argument("--cga-format", help="Publish in CGA network format", action="store_true")
     parser.add_argument("--anchor-config", help="Path to anchor config JSON", type=str, default=None)
     parser.add_argument("--dev-eui-mapping", help="Path to dev_eui mapping JSON", type=str, default=None)
@@ -211,12 +213,11 @@ class PacketProcessor:
                 network_data = self.uwb_converter.convert_edges_to_network(formatted_data, timestamp=current_timestamp)
                 if self.mqtt_client:
                     try:
-                        # Log the data being published (summary for verbose mode)
-                        if self.logger._verbose_flag:
-                            import json
-                            uwb_count = len(network_data.get("uwbs", []))
-                            total_edges = sum(len(uwb.get("edges", [])) for uwb in network_data.get("uwbs", []))
-                            self.logger.info(f"Publishing CGA network: {uwb_count} UWBs, {total_edges} edges")
+                        # Log the data being published
+                        import json
+                        uwb_count = len(network_data.get("uwbs", []))
+                        total_edges = sum(len(uwb.get("edges", [])) for uwb in network_data.get("uwbs", []))
+                        self.logger.log_published_data(f"CGA network: {uwb_count} UWBs, {total_edges} edges")
                         self.mqtt_client.publish(network_data)
                         if self.health_monitor:
                             self.health_monitor.record_mqtt_publish(success=True)
@@ -233,9 +234,8 @@ class PacketProcessor:
             # Publish in simple edge list format
             if self.mqtt_client:
                 try:
-                    # Log the data being published (summary for verbose mode)
-                    if self.logger._verbose_flag:
-                        self.logger.info(f"Publishing edge list: {len(formatted_data)} edges")
+                    # Log the data being published
+                    self.logger.log_published_data(f"Edge list: {len(formatted_data)} edges")
                     self.mqtt_client.publish(formatted_data)
                     if self.health_monitor:
                         self.health_monitor.record_mqtt_publish(success=True)
@@ -250,7 +250,12 @@ def main() -> None:
     args = parse_arguments()
 
     # Initialize logger
-    logger = UwbLogger(verbose=args.verbose, quiet=args.quiet)
+    logger = UwbLogger(
+        verbose=args.verbose,
+        quiet=args.quiet,
+        log_received_data=args.log_received_data,
+        log_published_data=args.log_published_data
+    )
 
     # Load dev_eui mapping
     dev_eui_map = {}
@@ -554,9 +559,9 @@ def main() -> None:
                                         error_handler=processor.handle_parsing_error
                                     )
 
-                                    # Log incoming distance data (summary)
-                                    if len(results) > 0 and logger._verbose_flag:
-                                        logger.info(f"Received distance packet: {len(results)} measurements")
+                                    # Log incoming distance data
+                                    if len(results) > 0:
+                                        logger.log_received_data(f"Distance packet: {len(results)} measurements")
 
                                     # Process and publish results
                                     processor.process_results(results, assignments)
