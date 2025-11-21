@@ -217,7 +217,9 @@ class PacketProcessor:
                         import json
                         uwb_count = len(network_data.get("uwbs", []))
                         total_edges = sum(len(uwb.get("edges", [])) for uwb in network_data.get("uwbs", []))
-                        self.logger.log_published_data(f"CGA network: {uwb_count} UWBs, {total_edges} edges")
+                        json_payload = json.dumps(network_data)
+                        topic = self.mqtt_client.topic if self.mqtt_client else "unknown"
+                        self.logger.log_published_data(f"Topic: {topic} | CGA network: {uwb_count} UWBs, {total_edges} edges | Payload: {json_payload}")
                         self.mqtt_client.publish(network_data)
                         if self.health_monitor:
                             self.health_monitor.record_mqtt_publish(success=True)
@@ -235,7 +237,10 @@ class PacketProcessor:
             if self.mqtt_client:
                 try:
                     # Log the data being published
-                    self.logger.log_published_data(f"Edge list: {len(formatted_data)} edges")
+                    import json
+                    json_payload = json.dumps(formatted_data)
+                    topic = self.mqtt_client.topic if self.mqtt_client else "unknown"
+                    self.logger.log_published_data(f"Topic: {topic} | Edge list: {len(formatted_data)} edges | Payload: {json_payload}")
                     self.mqtt_client.publish(formatted_data)
                     if self.health_monitor:
                         self.health_monitor.record_mqtt_publish(success=True)
@@ -282,6 +287,7 @@ def main() -> None:
                 username=args.lora_username,
                 password=args.lora_password,
                 topic_pattern=args.lora_topic,
+                logger=logger,
                 dev_eui_to_uwb_id_map=dev_eui_map,
                 verbose=args.verbose,
                 gps_ttl_seconds=args.lora_gps_max_age,
@@ -561,7 +567,14 @@ def main() -> None:
 
                                     # Log incoming distance data
                                     if len(results) > 0:
-                                        logger.log_received_data(f"Distance packet: {len(results)} measurements")
+                                        # Format parsed measurements for logging
+                                        measurements = []
+                                        for result in results:
+                                            node1 = "{:04X}".format(result[0])
+                                            node2 = "{:04X}".format(result[1])
+                                            distance = round(result[2], 3)
+                                            measurements.append(f"{node1}-{node2}:{distance}m")
+                                        logger.log_received_data(f"Distance packet: {len(results)} measurements - {', '.join(measurements)}")
 
                                     # Process and publish results
                                     processor.process_results(results, assignments)

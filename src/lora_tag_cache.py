@@ -37,7 +37,8 @@ class LoraTagDataCache:
                  verbose: bool = False,
                  gps_ttl_seconds: float = 300.0,  # 5 minutes default for GPS
                  sensor_ttl_seconds: float = 600.0,  # 10 minutes default for sensor data
-                 cleanup_interval_seconds: float = 60.0):  # Cleanup every minute
+                 cleanup_interval_seconds: float = 60.0,  # Cleanup every minute
+                 logger=None):  # Optional logger for data logging
         """
         Initialize the LoRa tag data cache.
 
@@ -63,6 +64,7 @@ class LoraTagDataCache:
         self.gps_ttl_seconds = gps_ttl_seconds
         self.sensor_ttl_seconds = sensor_ttl_seconds
         self.cleanup_interval_seconds = cleanup_interval_seconds
+        self.logger = logger  # Logger instance for data logging
 
         # Cache: dev_eui -> latest data
         self._cache: Dict[str, Dict[str, Any]] = {}
@@ -131,7 +133,20 @@ class LoraTagDataCache:
             self._log(f"Message payload (first 500 chars): {payload[:500]}", "VERBOSE")
 
             # Parse JSON payload
-            data = json.loads(payload)
+            try:
+                data = json.loads(payload)
+            except json.JSONDecodeError as e:
+                self._log(f"Failed to parse JSON payload: {e}", "ERROR")
+                # Log raw payload if logger is available
+                if self.logger and hasattr(self.logger, 'log_received_data'):
+                    self.logger.log_received_data(f"LoRa message | Topic: {topic} | Payload (invalid JSON): {payload}")
+                return
+            
+            # Log full LoRa message if logger is available and logging is enabled
+            if self.logger and hasattr(self.logger, 'log_received_data'):
+                dev_eui = data.get("end_device_ids", {}).get("dev_eui", "unknown")
+                device_id = data.get("end_device_ids", {}).get("device_id", "unknown")
+                self.logger.log_received_data(f"LoRa message | Topic: {topic} | Device: {device_id} (dev_eui: {dev_eui}) | Payload: {payload}")
 
             # Extract dev_eui
             dev_eui = None
@@ -329,8 +344,6 @@ class LoraTagDataCache:
                 else:
                     self._log(f"No UWB mapping for dev_eui={dev_eui}", "VERBOSE")
 
-        except json.JSONDecodeError as e:
-            self._log(f"Failed to parse JSON payload: {e}", "ERROR")
         except Exception as e:
             self._log(f"Error processing message: {e}", "ERROR")
             if self.verbose:
