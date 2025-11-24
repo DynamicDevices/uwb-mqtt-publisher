@@ -3,11 +3,11 @@
 Version information for UWB MQTT Publisher.
 """
 
-__version__ = "1.4.3"
-__version_info__ = (1, 4, 3)
+__version__ = "1.4.4"
+__version_info__ = (1, 4, 4)
 
 # Git commit hash (will be updated on commit)
-__git_hash__ = "ba4760b"
+__git_hash__ = "3f70e4f"
 
 
 def get_version():

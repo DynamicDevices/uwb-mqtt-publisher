@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.4.4] - 2025-11-20
+
+### Fixed
+- **Missing Anchors in Published Data**: Include all configured anchors in published data even if they don't have distance measurements (edges)
+  - Previously only anchors with edges were included
+  - Now all configured anchors are always published, ensuring complete anchor position data
+  - Fixes issue where anchors like B5A7 were missing from published data
+
 ## [1.4.3] - 2025-11-20
 
 ### Changed
