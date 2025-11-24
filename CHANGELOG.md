@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.4.3] - 2025-11-20
+
+### Changed
+- **CGA Network Format**: Removed unused `position` field (x, y, z) from published data
+  - Position data is stored in `latLonAlt` field
+  - Reduces payload size by removing redundant zero-value fields
+
 ## [1.4.2] - 2025-11-20
 
 ### Fixed
