@@ -147,6 +147,12 @@ class UwbNetworkConverter:
                 uwb_ids.add(edge[0])
                 uwb_ids.add(edge[1])
 
+        # Also include all configured anchors, even if they don't have edges yet
+        # This ensures all known anchor positions are always published
+        if self.anchor_map:
+            for anchor_id in self.anchor_map.keys():
+                uwb_ids.add(anchor_id)
+
         # Create UWB objects with default values
         uwbs = []
         sorted_ids = sorted(uwb_ids)
