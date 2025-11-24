@@ -86,6 +86,8 @@ def parse_arguments() -> argparse.Namespace:
     parser.add_argument("--backoff-multiplier", help="Exponential backoff multiplier (default: 2.0)", type=float, default=DEFAULT_BACKOFF_MULTIPLIER)
     parser.add_argument("--health-topic", help="MQTT topic for health reports (default: {mqtt_topic}/health)", type=str, default=None)
     parser.add_argument("--health-interval", help="Health report interval in seconds (default: 60)", type=float, default=DEFAULT_HEALTH_REPORT_INTERVAL)
+    parser.add_argument("--uwb-data-timeout", help="Seconds without UWB data before unhealthy (default: 300)", type=float, default=300.0)
+    parser.add_argument("--mqtt-connection-timeout", help="Seconds without MQTT connection before unhealthy (default: 60)", type=float, default=60.0)
     parser.add_argument("--graceful-degradation", help="Continue with partial data when possible", action="store_true")
     parser.add_argument("--enable-validation", help="Enable data validation and sanity checks", action="store_true")
     parser.add_argument("--min-distance", help="Minimum valid distance in meters (default: 0.0)", type=float, default=0.0)
@@ -130,6 +132,8 @@ class PacketProcessor:
 
     def handle_parsing_error(self, error_msg: str) -> bool:
         """Handle packet parsing errors."""
+        # Log the parsing error so we can see there's a problem
+        self.logger.error(f"Parsing error: {error_msg}")
         if self.error_recovery:
             if self.health_monitor:
                 self.health_monitor.record_parsing_error()
@@ -340,8 +344,18 @@ def main() -> None:
         logger=logger,
         mqtt_client=mqtt_client,
         health_topic=health_topic,
-        report_interval=args.health_interval
+        report_interval=args.health_interval,
+        uwb_data_timeout_seconds=args.uwb_data_timeout,
+        mqtt_connection_timeout_seconds=args.mqtt_connection_timeout
     )
+
+    # Initialize MQTT connection status after setup
+    if mqtt_client and mqtt_client.client:
+        mqtt_connected = mqtt_client.client.is_connected()
+        health_monitor.update_connection_status(
+            serial_connected=False,
+            mqtt_connected=mqtt_connected
+        )
 
     # Update health monitor with LoRa cache status
     if lora_cache:
@@ -454,8 +468,25 @@ def main() -> None:
 
         try:
             while True:
-                # Report health status periodically
+                # Update MQTT connection status in health monitor
+                if mqtt_client:
+                    mqtt_connected = mqtt_client.client and mqtt_client.client.is_connected() if mqtt_client.client else False
+                    health_monitor.update_connection_status(
+                        serial_connected=True,
+                        mqtt_connected=mqtt_connected
+                    )
+
+                # Report health status periodically (also writes health file for Docker health check)
                 health_monitor.report_health()
+                # Also force update health file every loop iteration (for Docker health check)
+                # This ensures health status is always current even if MQTT reporting is rate-limited
+                try:
+                    health_status = health_monitor.get_health_status()
+                    import json
+                    with open("/tmp/uwb-health-status.json", "w") as f:
+                        json.dump(health_status, f)
+                except Exception:
+                    pass  # Silently fail if we can't write health file
 
                 cnt = ser.in_waiting
                 if cnt > 0:
@@ -613,7 +644,9 @@ def main() -> None:
                                     error_recovery.reset_error_counts(ErrorType.CONNECTION)
                             continue
                         except (struct.error, ValueError, IndexError) as e:
-                            if processor.handle_parsing_error(f"Packet processing: {str(e)}"):
+                            error_msg = f"Packet processing: {str(e)}"
+                            logger.error(f"Failed to parse incoming UWB data: {error_msg}")
+                            if processor.handle_parsing_error(error_msg):
                                 # Check if we should reset with backoff
                                 if error_recovery.should_reset_with_backoff():
                                     if health_monitor:

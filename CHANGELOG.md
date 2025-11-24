@@ -2,6 +2,24 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.4.5] - 2025-01-XX
+
+### Added
+- Enhanced parsing error logging - parsing errors are now explicitly logged when UWB data cannot be parsed
+- UWB data reception timeout tracking - container marked unhealthy if no UWB data received for 5 minutes (configurable via `--uwb-data-timeout`)
+- MQTT connection timeout tracking - container marked unhealthy if MQTT disconnected for 60 seconds (configurable via `--mqtt-connection-timeout`)
+- Docker health check script (`healthcheck.sh`) that reads health status from `/tmp/uwb-health-status.json`
+- Health status file written continuously to `/tmp/uwb-health-status.json` for Docker health monitoring
+- Command-line arguments `--uwb-data-timeout` and `--mqtt-connection-timeout` for configuring health check timeouts
+
+### Changed
+- Health monitor now tracks last UWB data reception time and last MQTT connection time
+- Health status includes detailed connection and data reception information
+- Container health check now considers parsing errors, UWB data reception, and MQTT connection status
+
+### Fixed
+- Parsing errors are now properly logged so firmware issues are visible in container logs
+
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
