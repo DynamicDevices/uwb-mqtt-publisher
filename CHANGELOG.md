@@ -2,7 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-## [1.4.6] - 2025-01-25
+## [1.4.6] - 2025-11-24
 
 ### Fixed
 - Container entrypoint now runs Python application instead of sleep loop
