@@ -2,7 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
-## [1.4.5] - 2025-01-XX
+## [1.4.6] - 2025-01-25
+
+### Fixed
+- Container entrypoint now runs Python application instead of sleep loop
+- Container properly executes mqtt-live-publisher.py with all configured arguments
+
+## [1.4.5] - 2025-01-24
 
 ### Added
 - Enhanced parsing error logging - parsing errors are now explicitly logged when UWB data cannot be parsed
